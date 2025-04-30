@@ -34,9 +34,9 @@ Folder Structure
 │       ├── index.ts
 │       ├── controllers/
 │       ├── mcp/
+│       ├── server/
 │       ├── services/
-│       ├── types/
-│       └── utils/
+│       └── types/
 ```
 
 Quick Start
