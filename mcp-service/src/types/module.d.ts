@@ -11,7 +11,17 @@ declare module 'dotenv' {
 
 // For zod types that aren't being found automatically
 declare module 'zod' {
+  // Import the actual zod module
+  import * as zodImport from 'zod/lib';
+  
+  // Export all contents from zod
   export * from 'zod/lib';
+  
+  // Export the 'z' namespace which is commonly used
+  export const z: typeof zodImport;
+  
+  // Re-export the default export if any
+  export default zodImport;
 }
 
 // For express-rate-limit types that aren't being found automatically
