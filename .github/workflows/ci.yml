@@ -17,49 +17,54 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    # Generate lock files first to ensure they exist
+    - name: Generate package-lock.json files
+      run: |
+        # Create package-lock.json in the root
+        npm install --package-lock-only --no-fund
+        # Create package-lock.json in mcp-service
+        cd mcp-service && npm install --package-lock-only --no-fund
+        cd ..
+        # Create package-lock.json in crawl4ai-service
+        cd crawl4ai-service && npm install --package-lock-only --no-fund
+        cd ..
+    
+    # Setup Node.js with specific caching paths
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: '**/package-lock.json'
+        cache-dependency-path: |
+          package-lock.json
+          mcp-service/package-lock.json
+          crawl4ai-service/package-lock.json
     
+    # Install dependencies separately for each project
     - name: Install root dependencies
-      run: npm install
+      run: npm ci || npm install
     
     - name: Install dependencies for MCP service
-      run: |
-        cd mcp-service
-        npm ci
-      
-    - name: Generate package-lock.json files if they don't exist
-      run: |
-        # Create package-lock.json in the root if it doesn't exist
-        [ -f package-lock.json ] || npm install --package-lock-only
-        # Create package-lock.json in mcp-service if it doesn't exist
-        [ -f mcp-service/package-lock.json ] || (cd mcp-service && npm install --package-lock-only)
-        # Create package-lock.json in crawl4ai-service if it doesn't exist
-        [ -f crawl4ai-service/package-lock.json ] || (cd crawl4ai-service && npm install --package-lock-only)
-    
-    - name: Build MCP service
-      run: |
-        cd mcp-service
-        npm run build
-    
-    - name: Check for linting and formatting issues
-      run: |
-        cd mcp-service
-        npm run lint || echo "Linting step skipped, add a lint script to package.json to enable"
+      working-directory: ./mcp-service
+      run: npm ci || npm install
     
     - name: Install dependencies for crawl4ai-service
-      run: |
-        cd crawl4ai-service
-        npm ci
+      working-directory: ./crawl4ai-service
+      run: npm ci || npm install
+    
+    # Build the projects
+    - name: Build MCP service
+      working-directory: ./mcp-service
+      run: npm run build
     
     - name: Build crawl4ai-service
-      run: |
-        cd crawl4ai-service
-        npm run build
+      working-directory: ./crawl4ai-service
+      run: npm run build
     
+    - name: Check for linting and formatting issues
+      working-directory: ./mcp-service
+      run: npm run lint || echo "Linting step skipped, add a lint script to package.json to enable"
+    
+    # Run tests
     - name: Run tests
       run: npm run test:all || echo "Test step skipped, add test scripts to package.json files to enable"
