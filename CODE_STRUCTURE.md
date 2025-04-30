@@ -10,18 +10,45 @@ This document provides an overview of the source code structure of the Crawl4AI 
 
 ## Root
 
+- .github/
+  : GitHub-specific configuration for CI/CD workflows, issue templates, and PR templates.
+- .env
+  : Environment variables for local development.
+- .env-template
+  : Template for environment variables configuration.
+- .gitignore
+  : Git ignore configuration.
+- CODE_STRUCTURE.md
+  : This file, documenting the code structure.
+- CONTRIBUTING.md
+  : Guidelines for contributing to the project.
+- LICENSE.md
+  : MIT License file.
+- MCP_API.md
+  : Detailed API documentation.
+- OVERVIEW.md
+  : High-level architecture and conceptual overview.
+- README.md
+  : Project overview and quick start guide.
 - docker-compose.yml  
   : Defines development and production services and dependencies.
-- Dockerfile  
-  : Multi-stage build for production image of the API components.
-- package.json  
-  : Root project dependencies, scripts, and metadata.
-- tsconfig.json  
-  : TypeScript configuration for the root project.
 - crawl4ai-service/  
   : Service that performs web crawling tasks.
 - mcp-service/  
   : MCP protocol server implementation.
+
+## GitHub Configuration (.github/)
+
+- ISSUE_TEMPLATE/
+  - bug_report.md
+    : Template for creating bug reports.
+  - feature_request.md
+    : Template for requesting new features.
+- PULL_REQUEST_TEMPLATE.md
+  : Template for creating pull requests.
+- workflows/
+  - ci.yml
+    : GitHub Actions workflow for continuous integration.
 
 ## Crawl4AI Microservice (crawl4ai-service/)
 
@@ -34,12 +61,6 @@ This document provides an overview of the source code structure of the Crawl4AI 
 - src/
   - index.ts
     : Entry point for the microservice, initializes Express or HTTP transport.
-  - controllers/
-    : Route handlers for microservice-specific endpoints (e.g., advanced crawling tasks).
-  - services/
-    : Core logic for specialized crawling workflows and auxiliary integrations.
-  - utils/
-    : Utility functions shared across microservice modules (e.g., error handling, helpers).
 
 ## MCP Server (mcp-service/)
 
@@ -60,6 +81,9 @@ This document provides an overview of the source code structure of the Crawl4AI 
   - mcp/
     - SimpleMcpServer.ts
       : Implements MCP protocol logic and SSE handling.
+  - server/
+    - expressServer.ts
+      : Express server configuration and middleware setup.
   - services/
     - configService.ts
       : Loads and validates configuration from environment variables.
@@ -70,8 +94,3 @@ This document provides an overview of the source code structure of the Crawl4AI 
       : TypeScript types for MCP messages and requests.
     - modelcontextprotocol.d.ts
       : MCP SDK TypeScript declarations.
-  - utils/
-    - logger.ts
-      : Logging utilities.
-    - requestLogger.ts
-      : HTTP request logging middleware.

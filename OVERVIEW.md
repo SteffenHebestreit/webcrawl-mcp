@@ -1,6 +1,6 @@
-# Overview of Crawl4AI MCP Server
+# Overview of MCP-Server-Template
 
-This document provides a simplified guide to the Model Context Protocol (MCP) and explains the high‑level architecture of the Crawl4AI server.
+This document provides a simplified guide to the Model Context Protocol (MCP) and explains the high‑level architecture of the MCP-Server-Template.
 
 ## Additional Documentation
 

@@ -1,0 +1,36 @@
+{
+  "name": "mcp-server-template",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server template with web crawling capabilities",
+  "workspaces": [
+    "mcp-service",
+    "crawl4ai-service"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:mcp && npm run install:crawl",
+    "install:mcp": "cd mcp-service && npm install",
+    "install:crawl": "cd crawl4ai-service && npm install",
+    "build:all": "npm run build:mcp && npm run build:crawl",
+    "build:mcp": "cd mcp-service && npm run build",
+    "build:crawl": "cd crawl4ai-service && npm run build",
+    "start:mcp": "cd mcp-service && npm start",
+    "start:crawl": "cd crawl4ai-service && npm start",
+    "dev:mcp": "cd mcp-service && npm run dev",
+    "dev:crawl": "cd crawl4ai-service && npm run dev",
+    "test:all": "npm run test:mcp && npm run test:crawl",
+    "test:mcp": "cd mcp-service && npm test",
+    "test:crawl": "cd crawl4ai-service && npm test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "crawl4ai",
+    "web-crawler",
+    "ai-tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

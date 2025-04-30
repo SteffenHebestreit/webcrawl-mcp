@@ -1,4 +1,4 @@
-# Model Context Protocol (MCP) API Reference
+# MCP-Server-Template API Reference
 
 This document provides detailed specifications for the MCP server endpoints, JSON-RPC methods, request/response schemas, and examples.
 

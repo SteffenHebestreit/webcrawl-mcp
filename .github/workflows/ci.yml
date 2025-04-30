@@ -22,11 +22,24 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+        cache-dependency-path: '**/package-lock.json'
+    
+    - name: Install root dependencies
+      run: npm install
     
     - name: Install dependencies for MCP service
       run: |
         cd mcp-service
         npm ci
+      
+    - name: Generate package-lock.json files if they don't exist
+      run: |
+        # Create package-lock.json in the root if it doesn't exist
+        [ -f package-lock.json ] || npm install --package-lock-only
+        # Create package-lock.json in mcp-service if it doesn't exist
+        [ -f mcp-service/package-lock.json ] || (cd mcp-service && npm install --package-lock-only)
+        # Create package-lock.json in crawl4ai-service if it doesn't exist
+        [ -f crawl4ai-service/package-lock.json ] || (cd crawl4ai-service && npm install --package-lock-only)
     
     - name: Build MCP service
       run: |
@@ -49,8 +62,4 @@ jobs:
         npm run build
     
     - name: Run tests
-      run: |
-        cd mcp-service
-        npm test || echo "Test step skipped, add a test script to package.json to enable"
-        cd ../crawl4ai-service
-        npm test || echo "Test step skipped, add a test script to package.json to enable"
+      run: npm run test:all || echo "Test step skipped, add test scripts to package.json files to enable"

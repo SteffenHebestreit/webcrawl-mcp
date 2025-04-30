@@ -1,6 +1,6 @@
-# Contributing to Example MCP Server
+# Contributing to MCP-Server-Template
 
-Thank you for your interest in contributing to Crawl4AI Server! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to MCP-Server-Template! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -72,4 +72,4 @@ docker-compose up --build
 
 ## License
 
-By contributing to Crawl4AI Server, you agree that your contributions will be licensed under the project's MIT License.
+By contributing to MCP-Server-Template, you agree that your contributions will be licensed under the project's MIT License.

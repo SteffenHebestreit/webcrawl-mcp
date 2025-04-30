@@ -1,8 +1,8 @@
-# Crawl4AI Server
+# MCP-Server-Template
 
 This repository implements a Model Context Protocol (MCP) server for web crawling capabilities, exposing crawlers as LangChain-compatible tools or any MCP-compliant client. It includes two main services:
 
-- **crawl4ai-server**: An Express-based MCP server that discovers and serves crawling tools.
+- **mcp-service**: An Express-based MCP server that discovers and serves crawling tools.
 - **crawl4ai-service**: A microservice responsible for fetching and extracting web content (source repository: https://github.com/unclecode/crawl4ai)
 
 Documentation
@@ -15,28 +15,44 @@ Folder Structure
 ----------------
 ```
 .
-├── Dockerfile                # Multi-stage build for production image
-├── docker-compose.yml        # Defines multi-container environment
-├── README.md                 # Project overview and quick start
-├── OVERVIEW.md               # System overview and concepts
-├── CODE_STRUCTURE.md         # Detailed code structure documentation
-├── package.json              # Project metadata and dependencies
-├── tsconfig.json             # TypeScript compiler configuration
-├── crawl4ai-service/         # Service that performs web crawling
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/index.ts
-├── mcp-service/              # MCP server implementation
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── tsconfig.json
+├── .env                        # Environment variables configuration file
+├── .env-template               # Template for environment variables
+├── .github/                    # GitHub-specific files (workflows, templates)
+├── .gitignore                  # Git ignore configuration
+├── CODE_STRUCTURE.md           # Detailed code structure documentation
+├── CONTRIBUTING.md             # Contribution guidelines
+├── LICENSE.md                  # MIT License file
+├── MCP_API.md                  # API specifications document
+├── OVERVIEW.md                 # System overview document
+├── README.md                   # Project overview and quick start (this file)
+├── docker-compose.yml          # Defines multi-container environment
+│
+├── crawl4ai-service/           # Service that performs web crawling
+│   ├── Dockerfile              # Docker configuration for the crawler
+│   ├── package.json            # Package configuration
+│   ├── tsconfig.json           # TypeScript configuration
 │   └── src/
-│       ├── index.ts
-│       ├── controllers/
-│       ├── mcp/
-│       ├── services/
-│       ├── types/
-│       └── utils/
+│       └── index.ts            # Entry point for crawler service
+│
+└── mcp-service/                # MCP server implementation
+    ├── Dockerfile              # Docker configuration for MCP server
+    ├── package.json            # Package configuration
+    ├── tsconfig.json           # TypeScript configuration
+    └── src/
+        ├── index.ts            # Entry point for MCP server
+        ├── controllers/        # API endpoint controllers
+        │   ├── resourceController.ts
+        │   └── toolController.ts
+        ├── mcp/                # MCP protocol implementation
+        │   └── SimpleMcpServer.ts
+        ├── server/             # Express server configuration
+        │   └── expressServer.ts
+        ├── services/           # Business logic services
+        │   ├── configService.ts
+        │   └── crawlService.ts
+        └── types/              # TypeScript type definitions
+            ├── mcp.ts
+            └── modelcontextprotocol.d.ts
 ```
 
 Quick Start
