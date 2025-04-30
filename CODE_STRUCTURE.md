@@ -1,6 +1,6 @@
 # Code Structure Documentation
 
-This document provides an overview of the source code structure of the Crawl4AI Server, explaining what each file does and how it's used in the system.
+This document provides an overview of the source code structure of the MCP-Server-Template, explaining what each file does and how it's used in the system.
 
 ## Additional Documentation
 
@@ -30,11 +30,13 @@ This document provides an overview of the source code structure of the Crawl4AI 
   : High-level architecture and conceptual overview.
 - README.md
   : Project overview and quick start guide.
-- docker-compose.yml  
+- docker-compose.yml
   : Defines development and production services and dependencies.
-- crawl4ai-service/  
+- package.json
+  : Root package with workspace configuration for managing the monorepo.
+- crawl4ai-service/
   : Service that performs web crawling tasks.
-- mcp-service/  
+- mcp-service/
   : MCP protocol server implementation.
 
 ## GitHub Configuration (.github/)
@@ -70,6 +72,8 @@ This document provides an overview of the source code structure of the Crawl4AI 
   : MCP server dependencies, scripts, and metadata.
 - tsconfig.json
   : TypeScript configuration for the MCP server.
+- tsconfig.node.json
+  : Node.js-specific TypeScript configuration for better module resolution.
 - src/
   - index.ts
     : Entry point that bootstraps the Express server for MCP API.
@@ -77,7 +81,7 @@ This document provides an overview of the source code structure of the Crawl4AI 
     - resourceController.ts
       : Implements endpoints for content crawling and retrieval.
     - toolController.ts
-      : Exposes MCP tool invocation endpoints.
+      : Exposes MCP tool invocation endpoints with Zod validation.
   - mcp/
     - SimpleMcpServer.ts
       : Implements MCP protocol logic and SSE handling.
@@ -94,3 +98,5 @@ This document provides an overview of the source code structure of the Crawl4AI 
       : TypeScript types for MCP messages and requests.
     - modelcontextprotocol.d.ts
       : MCP SDK TypeScript declarations.
+    - module.d.ts
+      : Module declarations for external libraries like zod, dotenv, etc.

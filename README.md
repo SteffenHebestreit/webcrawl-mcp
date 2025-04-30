@@ -26,6 +26,7 @@ Folder Structure
 ├── OVERVIEW.md                 # System overview document
 ├── README.md                   # Project overview and quick start (this file)
 ├── docker-compose.yml          # Defines multi-container environment
+├── package.json                # Root package with workspace configuration
 │
 ├── crawl4ai-service/           # Service that performs web crawling
 │   ├── Dockerfile              # Docker configuration for the crawler
@@ -38,6 +39,7 @@ Folder Structure
     ├── Dockerfile              # Docker configuration for MCP server
     ├── package.json            # Package configuration
     ├── tsconfig.json           # TypeScript configuration
+    ├── tsconfig.node.json      # TypeScript Node.js-specific configuration
     └── src/
         ├── index.ts            # Entry point for MCP server
         ├── controllers/        # API endpoint controllers
@@ -51,8 +53,9 @@ Folder Structure
         │   ├── configService.ts
         │   └── crawlService.ts
         └── types/              # TypeScript type definitions
-            ├── mcp.ts
-            └── modelcontextprotocol.d.ts
+            ├── mcp.ts          # MCP type definitions
+            ├── modelcontextprotocol.d.ts # MCP SDK type declarations
+            └── module.d.ts     # Module declarations for external libraries
 ```
 
 Quick Start
