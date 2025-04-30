@@ -17,6 +17,18 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    # Debug: Check workspace structure
+    - name: Check workspace structure
+      run: |
+        echo "Workspace contents:"
+        ls -la
+        echo "mcp-service contents:"
+        ls -la mcp-service
+        echo "mcp-service/src contents:"
+        ls -la mcp-service/src
+        echo "mcp-service/src/types contents:"
+        ls -la mcp-service/src/types
+    
     # Generate lock files first to ensure they exist
     - name: Generate package-lock.json files
       run: |
@@ -50,9 +62,8 @@ jobs:
         npm ci || npm install
         # Ensure all required type declarations are installed
         npm install --save-dev @types/express @types/node @types/node-fetch @types/cors
-        # Check if modules without explicit @types packages need type declarations
-        npx typesync
-        npm install
+        # Install zod locally (to ensure it's properly available)
+        npm install --save zod
     
     - name: Install dependencies for crawl4ai-service
       working-directory: ./crawl4ai-service
@@ -60,10 +71,14 @@ jobs:
         npm ci || npm install
         npm install --save-dev @types/express @types/node @types/cors
     
-    # Build the projects
+    # Use a more direct approach for building
     - name: Build MCP service
       working-directory: ./mcp-service
-      run: npm run build
+      run: |
+        echo "Building with direct tsc command using tsconfig.node.json"
+        npx tsc --project tsconfig.node.json
+      env:
+        TS_NODE_PROJECT: "./tsconfig.node.json"
     
     - name: Build crawl4ai-service
       working-directory: ./crawl4ai-service
