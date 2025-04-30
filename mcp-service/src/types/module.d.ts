@@ -11,17 +11,23 @@ declare module 'dotenv' {
 
 // For zod types that aren't being found automatically
 declare module 'zod' {
-  // Import the actual zod module
-  import * as zodImport from 'zod/lib';
-  
-  // Export all contents from zod
-  export * from 'zod/lib';
-  
-  // Export the 'z' namespace which is commonly used
-  export const z: typeof zodImport;
-  
-  // Re-export the default export if any
-  export default zodImport;
+  // Define the basic ZodType interface that's used in the code
+  export interface ZodType<T = any, Def = any> {
+    _type: T;
+    _def: Def;
+  }
+
+  // Export the z namespace with its ZodType property
+  export namespace z {
+    export const string: ZodType<string>;
+    export const number: ZodType<number>;
+    export const boolean: ZodType<boolean>;
+    export const object: <T extends Record<string, ZodType>>(shape: T) => ZodType<{
+      [K in keyof T]: T[K]['_type'];
+    }>;
+    export const array: <T>(schema: ZodType<T>) => ZodType<T[]>;
+    export type ZodType<T = any> = import('zod').ZodType<T>;
+  }
 }
 
 // For express-rate-limit types that aren't being found automatically
