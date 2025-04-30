@@ -46,11 +46,19 @@ jobs:
     
     - name: Install dependencies for MCP service
       working-directory: ./mcp-service
-      run: npm ci || npm install
+      run: |
+        npm ci || npm install
+        # Ensure all required type declarations are installed
+        npm install --save-dev @types/express @types/node @types/node-fetch @types/cors
+        # Check if modules without explicit @types packages need type declarations
+        npx typesync
+        npm install
     
     - name: Install dependencies for crawl4ai-service
       working-directory: ./crawl4ai-service
-      run: npm ci || npm install
+      run: |
+        npm ci || npm install
+        npm install --save-dev @types/express @types/node @types/cors
     
     # Build the projects
     - name: Build MCP service
