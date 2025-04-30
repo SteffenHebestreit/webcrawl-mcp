@@ -1,0 +1,129 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      - "--api.insecure=true"  # Enable the dashboard (for development only)
+      - "--providers.docker=true"  # Enable Docker as a provider
+      - "--providers.docker.exposedbydefault=false"  # Don't expose all containers by default
+      - "--entrypoints.web.address=:80"  # Define an entrypoint for HTTP
+      - "--accesslog=true"  # Enable access logs
+      - "--log.level=INFO"  # Set log level
+      - "--ping=true"  # Enable ping endpoint for health checks
+    ports:
+      - "80:80"  # HTTP port
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Connect to Docker socket
+    networks:
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  mcp-server:
+    build:
+      context: ./mcp-service
+      dockerfile: Dockerfile
+      target: production  # Use the production stage from multi-stage build
+    container_name: mcp-server
+    restart: unless-stopped
+    environment:
+      - PORT=11235
+      - NODE_ENV=production
+      - CRAWL_SERVICE_URL=http://crawl4ai-service:3000
+      - LOG_LEVEL=info
+      - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-10mb}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-900000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      - CACHE_TTL=${CACHE_TTL:-3600}
+    depends_on:
+      - crawl4ai-service
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mcp-server.rule=Host(`mcp.localhost`)"
+      - "traefik.http.routers.mcp-server.entrypoints=web"
+      - "traefik.http.services.mcp-server.loadbalancer.server.port=11235"
+      # Add a specific path for MCP SSE endpoint
+      - "traefik.http.routers.mcp-server-sse.rule=Host(`mcp.localhost`) && PathPrefix(`/mcp/sse`)"
+      - "traefik.http.routers.mcp-server-sse.entrypoints=web"
+      # Health check configuration
+      - "traefik.http.services.mcp-server.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.mcp-server.loadbalancer.healthcheck.interval=10s"
+    networks:
+      - web
+    volumes:
+      - mcp_logs:/app/logs
+    # Add security options
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  crawl4ai-service:
+    build:
+      context: ./crawl4ai-service
+      dockerfile: Dockerfile
+    container_name: crawl4ai-service
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - MAX_CONCURRENT_CRAWLS=3  # Limit concurrent crawls
+      - CHROME_DISABLE_SANDBOX=true  # Required for Chrome in Docker
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crawl4ai-service.rule=Host(`crawl4ai.localhost`)"
+      - "traefik.http.routers.crawl4ai-service.entrypoints=web"
+      - "traefik.http.services.crawl4ai-service.loadbalancer.server.port=3000"
+      # Health check configuration
+      - "traefik.http.services.crawl4ai-service.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.crawl4ai-service.loadbalancer.healthcheck.interval=10s"
+    tmpfs:
+      - /tmp/crawl4ai-service:exec,size=1G
+    networks:
+      - web
+    volumes:
+      - crawler_data:/app/data
+      - crawler_logs:/app/logs
+    # Security options to allow Chrome to run properly
+    security_opt:
+      - seccomp=unconfined  # Required for Chrome
+      - no-new-privileges:true
+    cap_add:
+      - SYS_ADMIN  # Required for Chrome
+    # Resource constraints to prevent browser automation from consuming too much memory
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+networks:
+  web:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  mcp_logs:
+  crawler_data:
+  crawler_logs:

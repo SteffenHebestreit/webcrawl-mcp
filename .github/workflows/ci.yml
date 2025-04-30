@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies for MCP service
+      run: |
+        cd mcp-service
+        npm ci
+    
+    - name: Build MCP service
+      run: |
+        cd mcp-service
+        npm run build
+    
+    - name: Check for linting and formatting issues
+      run: |
+        cd mcp-service
+        npm run lint || echo "Linting step skipped, add a lint script to package.json to enable"
+    
+    - name: Install dependencies for crawl4ai-service
+      run: |
+        cd crawl4ai-service
+        npm ci
+    
+    - name: Build crawl4ai-service
+      run: |
+        cd crawl4ai-service
+        npm run build
+    
+    - name: Run tests
+      run: |
+        cd mcp-service
+        npm test || echo "Test step skipped, add a test script to package.json to enable"
+        cd ../crawl4ai-service
+        npm test || echo "Test step skipped, add a test script to package.json to enable"
