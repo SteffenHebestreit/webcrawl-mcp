@@ -34,12 +34,6 @@ This document provides an overview of the source code structure of the Crawl4AI 
 - src/
   - index.ts
     : Entry point for the microservice, initializes Express or HTTP transport.
-  - controllers/
-    : Route handlers for microservice-specific endpoints (e.g., advanced crawling tasks).
-  - services/
-    : Core logic for specialized crawling workflows and auxiliary integrations.
-  - utils/
-    : Utility functions shared across microservice modules (e.g., error handling, helpers).
 
 ## MCP Server (mcp-service/)
 
