@@ -1,31 +1,12 @@
-import { ResourceController } from './controllers/resourceController';
-import { ToolController } from './controllers/toolController';
-import { SimpleMcpServer } from './mcp/SimpleMcpServer';
-import { ExpressServer } from './server/expressServer';
-import config from './services/configService';
-import dotenv from 'dotenv';
-
-// Load .env file
-dotenv.config();
+import { Server } from './server/server';
+import config from './config';
 
 /**
- * Bootstrap the MCP server application
+ * Bootstrap the application
  */
 function bootstrap() {
-  // Create controllers
-  const resourceController = new ResourceController(config);
-  const toolController = new ToolController(config);
-
-  // Create MCP server instance
-  const mcpServer = new SimpleMcpServer(config);
-
-  // Register resources and tools
-  mcpServer.resource(resourceController.getInfoResourceConfig());
-  mcpServer.tool(toolController.getCrawlToolConfig());
-  mcpServer.tool(toolController.getMarkdownCrawlToolConfig());
-
-  // Create and start Express server
-  const server = new ExpressServer(mcpServer, config);
+  // Create and start the unified server
+  const server = new Server();
   const port = config.get('port');
   server.start(port);
 

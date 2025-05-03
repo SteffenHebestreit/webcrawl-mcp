@@ -1,14 +1,12 @@
-import { ConfigService } from '../services/configService';
+import config from '../config';
 import { ResourceConfig, ResourceGetResponse, ResourceListResponse } from '../types/mcp';
 
 /**
  * Controller for handling MCP resource operations
  */
 export class ResourceController {
-  private config: ConfigService;
-
-  constructor(config: ConfigService) {
-    this.config = config;
+  constructor(config: any) {
+    // No longer need to store config as we're importing it directly
   }
   
   /**
@@ -39,9 +37,9 @@ export class ResourceController {
    * Get info resource content
    */
   private async getInfoResource(): Promise<ResourceGetResponse> {
-    const serverName = this.config.get('mcpName');
-    const version = this.config.get('mcpVersion');
-    const description = this.config.get('mcpDescription');
+    const serverName = config.get('mcpName');
+    const version = config.get('mcpVersion');
+    const description = config.get('mcpDescription');
     
     return {
       contents: [

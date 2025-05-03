@@ -1,9 +1,6 @@
 # MCP-Server-Template
 
-This repository implements a Model Context Protocol (MCP) server for web crawling capabilities, exposing crawlers as LangChain-compatible tools or any MCP-compliant client. It includes two main services:
-
-- **mcp-service**: An Express-based MCP server that discovers and serves crawling tools.
-- **crawl4ai-service**: A microservice responsible for fetching and extracting web content (source repository: https://github.com/unclecode/crawl4ai)
+This repository implements a Model Context Protocol (MCP) server for web crawling capabilities, exposing crawlers as tools for any MCP-compliant client. It features a unified server architecture with centralized configuration.
 
 Documentation
 -------------
@@ -28,13 +25,6 @@ Folder Structure
 ├── docker-compose.yml          # Defines multi-container environment
 ├── package.json                # Root package with workspace configuration
 │
-├── crawl4ai-service/           # Service that performs web crawling
-│   ├── Dockerfile              # Docker configuration for the crawler
-│   ├── package.json            # Package configuration
-│   ├── tsconfig.json           # TypeScript configuration
-│   └── src/
-│       └── index.ts            # Entry point for crawler service
-│
 └── mcp-service/                # MCP server implementation
     ├── Dockerfile              # Docker configuration for MCP server
     ├── package.json            # Package configuration
@@ -42,16 +32,25 @@ Folder Structure
     ├── tsconfig.node.json      # TypeScript Node.js-specific configuration
     └── src/
         ├── index.ts            # Entry point for MCP server
+        ├── config/             # Centralized configuration
+        │   ├── index.ts        # Main configuration entry point
+        │   ├── appConfig.ts    # Application settings
+        │   ├── mcpConfig.ts    # MCP-specific settings
+        │   ├── securityConfig.ts # Security-related settings
+        │   ├── crawlConfig.ts  # Web crawling settings
+        │   └── utils.ts        # Configuration utility functions
         ├── controllers/        # API endpoint controllers
         │   ├── resourceController.ts
         │   └── toolController.ts
         ├── mcp/                # MCP protocol implementation
         │   └── SimpleMcpServer.ts
-        ├── server/             # Express server configuration
-        │   └── expressServer.ts
+        ├── routes/             # Route definitions
+        │   ├── apiRoutes.ts    # General API endpoints
+        │   └── mcpRoutes.ts    # MCP-specific endpoints
+        ├── server/             # Unified server implementation
+        │   └── server.ts       # Express and MCP server integration
         ├── services/           # Business logic services
-        │   ├── configService.ts
-        │   └── crawlService.ts
+        │   └── crawlExecutionService.ts  # Web crawling service
         └── types/              # TypeScript type definitions
             ├── mcp.ts          # MCP type definitions
             ├── modelcontextprotocol.d.ts # MCP SDK type declarations
@@ -80,27 +79,13 @@ docker-compose up --build
    npm start
    ```
 
-### Running the crawl4ai-service Microservice Locally
-
-1. Navigate to the service folder and install dependencies:
-   ```bash
-   cd crawl4ai-service
-   npm install
-   ```
-2. Build and start the microservice:
-   ```bash
-   npm run build
-   npm start
-   ```
-3. The microservice will be available at its default port (check `crawl4ai-service/package.json` for the `start` script or default configuration).
-
 # API Usage Examples
 
 See detailed API documentation in [MCP_API.md](MCP_API.md).
 
 ### Capabilities
 ```bash
-curl -N -X POST http://localhost:${PORT:-11235}/mcp/sse \
+curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
@@ -117,7 +102,7 @@ Response:
 
 ### Use Tool (crawl)
 ```bash
-curl -N -X POST http://localhost:${PORT:-11235}/mcp/sse \
+curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
@@ -135,100 +120,66 @@ Response:
 {"jsonrpc":"2.0","result":{"success":true,"url":"https://example.com","text":"<html>..."},"id":2}
 ```
 
-### Resource List (info)
+### Health Check
 ```bash
-curl -N -X POST http://localhost:${PORT:-11235}/mcp/sse \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.resource.list",
-      "params": { "name": "info" },
-      "id": 3
-    }'
+curl http://localhost:${PORT:-3000}/api/health
+```
+
+Response:
+```
+OK
+```
+
+### Version Info
+```bash
+curl http://localhost:${PORT:-3000}/api/version
 ```
 
 Response:
 ```json
-{"jsonrpc":"2.0","result":{"uris":["info://about"]},"id":3}
-```
-
-### Resource Get (info://about)
-```bash
-curl -N -X POST http://localhost:${PORT:-11235}/mcp/sse \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.resource.get",
-      "params": { "uri": "info://about" },
-      "id": 4
-    }'
-```
-
-Response:
-```json
-{"jsonrpc":"2.0","result":{"contents":[{"uri":"info://about","text":"# MyMCPServer v1.0.0\n\nDescription..."}]},"id":4}
+{"name":"Crawl4AI-MCP","version":"1.0.0","description":"MCP Server for Crawl4AI"}
 ```
 
 Environment Variables
 ---------------------
-- `PORT` (default: 11235): Port for the MCP server.
-- `CRAWL_SERVICE_URL`: URL of the crawl4ai-service (e.g., `http://localhost:3000`).
+- `PORT` (default: 3000): Port for the MCP server.
 - `MAX_REQUEST_SIZE` (default: `10mb`): Maximum HTTP payload size.
 - `CORS_ORIGINS` (default: `*`): Allowed origins for CORS.
 - `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`, `CACHE_TTL`: Rate limiting and cache settings.
+- `MCP_NAME`, `MCP_VERSION`, `MCP_DESCRIPTION`: MCP server identification.
+- `CRAWL_DEFAULT_MAX_PAGES`, `CRAWL_DEFAULT_DEPTH`: Default crawling settings.
 
 Configuration
 -------------
-All environment variables are loaded and validated in `src/services/configService.ts`.
+All configuration is centralized in the `src/config` directory with separate modules for different aspects of the system:
+- `appConfig.ts`: Core application settings
+- `mcpConfig.ts`: MCP server specific settings
+- `securityConfig.ts`: Security-related settings
+- `crawlConfig.ts`: Web crawling default parameters
 
 Key Components
 --------------
+- **Server**: Unified server implementation integrating Express and MCP capabilities.
+- **Routes**: Organized in separate files for API and MCP endpoints.
 - **SimpleMcpServer**: Implements MCP discovery and tool invocation logic.
-- **Controllers**: `toolController` and `resourceController` for MCP and REST endpoints.
-- **CrawlService**: Fetches and parses web pages.
-- **ExpressServer**: Bootstraps middleware, routing, logging, and error handling.
+- **Controllers**: `toolController` and `resourceController` for handling business logic.
+- **Configuration**: Centralized configuration system with module-specific settings.
 
 Customization
 -------------
-- Add new Crawling or parsing logic in `src/services/crawlService.ts`.
-- Extend MCP capabilities by modifying `src/mcp/SimpleMcpServer.ts` or adding new controllers.
-- Tune performance and security via environment variables in `configService.ts`.
+- Add new routes in the `routes` directory.
+- Extend MCP capabilities by modifying `SimpleMcpServer` or adding new controllers.
+- Tune performance and security via environment variables in the `config` directory.
 
-## Sample Diagrams
-
-### Architecture Diagram
+## Architecture Diagram
 ```mermaid
 graph LR
-  Client --> ExpressServer
-  ExpressServer --> SimpleMcpServer
-  SimpleMcpServer --> CrawlService
-  CrawlService --> crawl4ai-service
-```
-
-### Crawling Sequence Diagram
-```mermaid
-sequenceDiagram
-  participant Client
-  participant Server
-
-  Client->>Server: POST /mcp/sse (handshake)
-  Server-->>Client: SSE event (connection details)
-  Client->>Server: JSON-RPC mcp.tool.use
-  Server-->>Client: JSON-RPC response (tool result)
-```
-
-### Controllers Class Diagram
-```mermaid
-classDiagram
-  class ResourceController {
-    +listResources()
-    +getResource(uri)
-  }
-  class ToolController {
-    +useTool(name, parameters)
-  }
-  ResourceController --> SimpleMcpServer
-  ToolController --> SimpleMcpServer
+  Client --> Server
+  Server --> Router["Routes (API/MCP)"]
+  Router --> SimpleMcpServer
+  Router --> ApiControllers
+  SimpleMcpServer --> Controllers
+  Controllers --> CrawlExecutionService
 ```
 
 ## References
@@ -237,8 +188,6 @@ classDiagram
 - [Code Structure](CODE_STRUCTURE.md): Detailed explanations of source files.
 - [MCP API Reference](MCP_API.md): Endpoint specs and JSON-RPC methods.
 - [Model Context Protocol SDK](https://www.npmjs.com/package/@modelcontextprotocol/sdk): Official SDK documentation.
-- [Mermaid](https://mermaid-js.github.io/): Diagram syntax guide.
-- [Crawl4AI Service](./crawl4ai-service/): Microservice for fetching and extracting web content.
 
 ## License
 

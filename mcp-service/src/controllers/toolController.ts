@@ -1,10 +1,10 @@
-import { z } from 'zod';
-import { ConfigService } from '../services/configService';
-import { CrawlService } from '../services/crawlService';
-import { 
-  CrawlParams, 
-  CrawlResponse, 
-  CrawlWithMarkdownParams, 
+import Joi from 'joi';
+import config from '../config';
+import { CrawlExecutionService } from '../services/crawlExecutionService';
+import {
+  CrawlParams,
+  CrawlResponse,
+  CrawlWithMarkdownParams,
   CrawlWithMarkdownResponse,
   ToolConfig
 } from '../types/mcp';
@@ -13,12 +13,10 @@ import {
  * Controller for handling MCP tool operations
  */
 export class ToolController {
-  private crawlService: CrawlService;
-  private config: ConfigService;
+  private crawlExecutor: CrawlExecutionService;
 
-  constructor(config: ConfigService) {
-    this.config = config;
-    this.crawlService = new CrawlService(config);
+  constructor(config: any, crawlExecutor: CrawlExecutionService) {
+    this.crawlExecutor = crawlExecutor;
   }
 
   /**
@@ -27,25 +25,26 @@ export class ToolController {
   getCrawlToolConfig(): ToolConfig<CrawlParams, CrawlResponse> {
     return {
       name: "crawl",
-      parameters: z.object({
-        url: z.string().url("Please provide a valid URL"),
-        maxPages: z.number().optional(),
-        depth: z.number().optional(),
-        strategy: z.enum(["bfs", "dfs", "bestFirst"]).optional(),
-        captureNetworkTraffic: z.boolean().optional(),
-        captureScreenshots: z.boolean().optional(),
-        waitTime: z.number().optional()
+      parameters: Joi.object({
+        url: Joi.string().uri().required().messages({'string.uri': 'Please provide a valid URL'}),
+        maxPages: Joi.number().integer().min(1).optional(),
+        depth: Joi.number().integer().min(0).optional(),
+        strategy: Joi.string().valid("bfs", "dfs", "bestFirst").optional(),
+        captureNetworkTraffic: Joi.boolean().optional(),
+        captureScreenshots: Joi.boolean().optional(),
+        waitTime: Joi.number().integer().min(0).optional()
       }),
-      returns: z.object({
-        success: z.boolean(),
-        url: z.string(),
-        text: z.string(),
-        tables: z.array(z.any()).optional()
+      returns: Joi.object({
+        success: Joi.boolean().required(),
+        url: Joi.string().uri().required(),
+        text: Joi.string().required(),
+        tables: Joi.array().items(Joi.any()).optional(),
+        error: Joi.string().optional()
       }),
       execute: this.executeCrawl.bind(this),
-      description: "Crawl a website and extract structured information",
-      parameterDescription: "URL to crawl along with optional crawling parameters",
-      returnDescription: "Extracted text content and structured data"
+      description: "Crawl a website and extract text content and tables.",
+      parameterDescription: "URL to crawl along with optional crawling parameters like maxPages, depth, strategy, etc.",
+      returnDescription: "Object containing success status, original URL, extracted text content, optional tables, and optional error message."
     };
   }
 
@@ -55,90 +54,74 @@ export class ToolController {
   getMarkdownCrawlToolConfig(): ToolConfig<CrawlWithMarkdownParams, CrawlWithMarkdownResponse> {
     return {
       name: "crawlWithMarkdown",
-      parameters: z.object({
-        url: z.string().url("Please provide a valid URL"),
-        maxPages: z.number().optional(),
-        depth: z.number().optional(),
-        strategy: z.enum(["bfs", "dfs", "bestFirst"]).optional(),
-        query: z.string().optional()
+      parameters: Joi.object({
+        url: Joi.string().uri().required().messages({'string.uri': 'Please provide a valid URL'}),
+        maxPages: Joi.number().integer().min(1).optional(),
+        depth: Joi.number().integer().min(0).optional(),
+        strategy: Joi.string().valid("bfs", "dfs", "bestFirst").optional(),
+        query: Joi.string().optional()
       }),
-      returns: z.object({
-        success: z.boolean(),
-        url: z.string(),
-        markdown: z.string()
+      returns: Joi.object({
+        success: Joi.boolean().required(),
+        url: Joi.string().uri().required(),
+        markdown: Joi.string().required(),
+        error: Joi.string().optional()
       }),
       execute: this.executeCrawlWithMarkdown.bind(this),
-      description: "Crawl a website and return markdown-formatted content",
-      parameterDescription: "URL to crawl and optional parameters including a specific question to answer",
-      returnDescription: "Markdown-formatted content from the crawled website"
+      description: "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
+      parameterDescription: "URL to crawl, optional crawling parameters, and an optional query.",
+      returnDescription: "Object containing success status, original URL, markdown content, and optional error message."
     };
   }
 
   /**
-   * Execute the basic crawl operation
+   * Execute the basic crawl operation using CrawlExecutionService
    */
   private async executeCrawl(params: CrawlParams): Promise<CrawlResponse> {
+    console.log('Executing crawl with params:', params);
     try {
-      const { url, maxPages, depth, strategy, captureNetworkTraffic, captureScreenshots, waitTime } = params;
-      
-      // Create options object for crawl service
-      const options = {
-        maxPages,
-        depth,
-        strategy,
-        captureNetworkTraffic,
-        captureScreenshots,
-        waitTime
-      };
-      
-      const result = await this.crawlService.crawlWebsite(url, options);
-      
+      const result = await this.crawlExecutor.executeCrawl(params.url, params);
+
       return {
         success: result.success,
         url: result.url,
-        text: result.text,
-        tables: result.media?.tables
+        text: result.text ?? (result.success ? 'No text content extracted.' : 'Error occurred during crawl.'),
+        tables: result.media?.tables ?? [],
+        error: result.error
       };
     } catch (error: any) {
-      console.error('Error during crawling:', error);
+      console.error('Error in ToolController executeCrawl:', error);
       return {
         success: false,
         url: params.url,
-        text: `Error: ${error.message || 'Unknown error during crawling'}`,
-        tables: []
+        text: `Failed to execute crawl: ${error.message}`,
+        tables: [],
+        error: error.message
       };
     }
   }
 
   /**
-   * Execute the markdown crawl operation
+   * Execute the markdown crawl operation using CrawlExecutionService
    */
   private async executeCrawlWithMarkdown(params: CrawlWithMarkdownParams): Promise<CrawlWithMarkdownResponse> {
+    console.log('Executing crawlWithMarkdown with params:', params);
     try {
-      const { url, maxPages, depth, strategy, query } = params;
-      
-      // Create options object for crawl service
-      const options = {
-        maxPages,
-        depth,
-        strategy,
-        query,
-        markdownFormat: true
-      };
-      
-      const result = await this.crawlService.crawlWebsite(url, options);
-      
+      const result = await this.crawlExecutor.executeCrawl(params.url, params);
+
       return {
         success: result.success,
         url: result.url,
-        markdown: result.markdown
+        markdown: result.markdown ?? (result.success ? 'No markdown content generated.' : `# Error\n\n${result.error || 'Unknown error occurred during crawl.'}`),
+        error: result.error
       };
     } catch (error: any) {
-      console.error('Error during markdown crawling:', error);
+      console.error('Error in ToolController executeCrawlWithMarkdown:', error);
       return {
         success: false,
         url: params.url,
-        markdown: `# Error\n\nError occurred while crawling ${params.url}: ${error.message || 'Unknown error'}`
+        markdown: `# Error\n\nFailed to execute markdown crawl: ${error.message}`,
+        error: error.message
       };
     }
   }

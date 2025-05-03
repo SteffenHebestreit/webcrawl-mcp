@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ConfigService } from '../services/configService';
+import config from '../config';
 import { ToolConfig, ResourceConfig } from '../types/mcp';
 
 /**
@@ -7,12 +7,11 @@ import { ToolConfig, ResourceConfig } from '../types/mcp';
  * that supports dynamic registration of tools and resources
  */
 export class SimpleMcpServer {
-  private config: ConfigService;
   private tools: ToolConfig<any, any>[] = [];
   private resources: ResourceConfig[] = [];
 
-  constructor(config: ConfigService) {
-    this.config = config;
+  constructor(config: any) {
+    // No longer need to store config as a class property since we're importing it directly
   }
   
   /**
@@ -41,9 +40,9 @@ export class SimpleMcpServer {
         jsonrpc: '2.0',
         result: {
           mcp: {
-            name: this.config.get('mcpName'),
-            version: this.config.get('mcpVersion'),
-            description: this.config.get('mcpDescription')
+            name: config.get('mcpName'),
+            version: config.get('mcpVersion'),
+            description: config.get('mcpDescription')
           }
         },
         id: null
@@ -134,11 +133,17 @@ export class SimpleMcpServer {
   private async handleToolUseRequest(params: any, res: Response, id: string | number): Promise<void> {
     const { name, parameters } = params;
     console.log(`Tool use request for ${name} with params:`, parameters);
-    
+
     try {
       const tool = this.tools.find(t => t.name === name);
       if (!tool) throw new Error(`Tool not found: ${name}`);
-      const validParams = tool.parameters.parse(parameters);
+
+      // Validate parameters using Joi
+      const { error, value: validParams } = tool.parameters.validate(parameters);
+      if (error) {
+        throw new Error(`Invalid parameters for tool ${name}: ${error.details.map(d => d.message).join(', ')}`);
+      }
+
       const result = await tool.execute(validParams);
       this.sendMessage(res, { jsonrpc: '2.0', result, id });
     } catch (error: any) {

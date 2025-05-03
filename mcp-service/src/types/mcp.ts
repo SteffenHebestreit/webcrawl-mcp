@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import Joi from 'joi'; // Changed from 'zod';
 
 /**
  * MCP Server configuration options
@@ -26,8 +26,8 @@ export interface ResourceConfig {
  */
 export interface ToolConfig<P, R> {
   name: string;
-  parameters: z.ZodType<P>;
-  returns: z.ZodType<R>;
+  parameters: Joi.Schema; // Changed from z.ZodType<P>
+  returns: Joi.Schema;    // Changed from z.ZodType<R>
   execute: (params: P) => Promise<R>;
   description: string;
   parameterDescription: string;
@@ -85,10 +85,12 @@ export interface CrawlResponse {
   url: string;
   text: string;
   tables?: any[];
+  error?: string; // Added optional error field
 }
 
 export interface CrawlWithMarkdownResponse {
   success: boolean;
   url: string;
   markdown: string;
+  error?: string; // Added optional error field
 }

@@ -34,8 +34,6 @@ This document provides an overview of the source code structure of the MCP-Serve
   : Defines development and production services and dependencies.
 - package.json
   : Root package with workspace configuration for managing the monorepo.
-- crawl4ai-service/
-  : Service that performs web crawling tasks.
 - mcp-service/
   : MCP protocol server implementation.
 
@@ -52,18 +50,6 @@ This document provides an overview of the source code structure of the MCP-Serve
   - ci.yml
     : GitHub Actions workflow for continuous integration.
 
-## Crawl4AI Microservice (crawl4ai-service/)
-
-- Dockerfile
-  : Docker configuration for the standalone crawler microservice.
-- package.json
-  : Dependencies, scripts, and metadata specific to the microservice.
-- tsconfig.json
-  : TypeScript configuration scoped to the microservice codebase.
-- src/
-  - index.ts
-    : Entry point for the microservice, initializes Express or HTTP transport.
-
 ## MCP Server (mcp-service/)
 
 - Dockerfile
@@ -76,27 +62,91 @@ This document provides an overview of the source code structure of the MCP-Serve
   : Node.js-specific TypeScript configuration for better module resolution.
 - src/
   - index.ts
-    : Entry point that bootstraps the Express server for MCP API.
-  - controllers/
-    - resourceController.ts
-      : Implements endpoints for content crawling and retrieval.
-    - toolController.ts
-      : Exposes MCP tool invocation endpoints with Zod validation.
-  - mcp/
-    - SimpleMcpServer.ts
-      : Implements MCP protocol logic and SSE handling.
-  - server/
-    - expressServer.ts
-      : Express server configuration and middleware setup.
-  - services/
-    - configService.ts
-      : Loads and validates configuration from environment variables.
-    - crawlService.ts
-      : Business logic for crawling and parsing web content.
-  - types/
-    - mcp.ts
-      : TypeScript types for MCP messages and requests.
-    - modelcontextprotocol.d.ts
-      : MCP SDK TypeScript declarations.
-    - module.d.ts
-      : Module declarations for external libraries like zod, dotenv, etc.
+    : Entry point that bootstraps the unified server.
+
+### Configuration (src/config/)
+
+- index.ts
+  : Main configuration entry point that combines all configuration modules.
+- appConfig.ts
+  : Core application settings like port, environment, and logging.
+- mcpConfig.ts
+  : MCP server specific settings for name, version, and description.
+- securityConfig.ts
+  : Security-related settings for CORS and rate limiting.
+- crawlConfig.ts
+  : Web crawling settings for page limits, depth, and strategies.
+- utils.ts
+  : Utility functions for parsing environment variables.
+
+### Controllers (src/controllers/)
+
+- resourceController.ts
+  : Implements endpoints for resource management with the new config structure.
+- toolController.ts
+  : Exposes MCP tool invocation endpoints with Joi validation.
+
+### MCP Implementation (src/mcp/)
+
+- SimpleMcpServer.ts
+  : Implements MCP protocol logic and SSE handling with the new config structure.
+
+### Routes (src/routes/)
+
+- apiRoutes.ts
+  : Defines general API endpoints like health checks and version info.
+- mcpRoutes.ts
+  : Defines MCP-specific endpoints for SSE connections.
+
+### Server (src/server/)
+
+- server.ts
+  : Unified server implementation that integrates Express and MCP capabilities.
+
+### Services (src/services/)
+
+- crawlExecutionService.ts
+  : Business logic for crawling and parsing web content.
+
+### Types (src/types/)
+
+- mcp.ts
+  : TypeScript types for MCP messages and requests.
+- modelcontextprotocol.d.ts
+  : MCP SDK TypeScript declarations.
+- module.d.ts
+  : Module declarations for external libraries.
+
+## Architectural Patterns
+
+### Unified Server Architecture
+
+The server architecture has been refactored to follow a unified approach where:
+
+1. All configuration is centralized in the `config` directory
+2. The Express and MCP servers are integrated in a single `Server` class
+3. Routes are organized in separate modules for better maintainability
+
+### Routing Structure
+
+The routing system follows a modular pattern where:
+
+1. Different route groups (API, MCP) are defined in separate files
+2. Each route module exports a function that returns an Express router
+3. The unified server mounts these routers at appropriate paths
+
+### Configuration Architecture
+
+The configuration system follows a modular pattern where:
+
+1. Each aspect of the system has its own configuration module
+2. All modules are combined in the main `config/index.ts` file
+3. Environment variables are handled through utility functions
+
+### Controller Pattern
+
+Controllers follow the single responsibility principle:
+
+1. `toolController` handles tool-related operations
+2. `resourceController` handles resource-related operations
+3. Both use the centralized configuration system
