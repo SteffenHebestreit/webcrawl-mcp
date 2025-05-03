@@ -55,8 +55,8 @@ RUN npm run build
 FROM base AS production
 
 ENV NODE_ENV=production \
-    # Skip downloading Chromium during npm install if needed (Puppeteer will download on first launch)
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    # Don't skip Chrome download - we need it for puppeteer
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false \
     # Set a cache directory for Puppeteer downloads inside the container
     PUPPETEER_CACHE_DIR=/app/.cache/puppeteer
 
@@ -70,16 +70,18 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 
 # Install only production Node dependencies
-# Puppeteer is needed in production
-RUN npm ci --only=production --ignore-scripts || npm install --only=production --ignore-scripts
+# Install puppeteer with Chrome included
+RUN npm ci --only=production || npm install --only=production
+# Explicitly install Chrome with puppeteer
+RUN npx puppeteer browsers install chrome
 
 # Create cache directory and set ownership
 RUN mkdir -p ${PUPPETEER_CACHE_DIR} && chown -R appuser:appgroup /app
 
-USER appuser
+# Allow execution of chrome
+RUN chmod -R o+rwx /app/.cache/puppeteer
 
-# Puppeteer might download Chromium on first run, ensure the user can write to the cache dir
-# The download path can be configured via environment variables if needed.
+USER appuser
 
 EXPOSE 11235
 

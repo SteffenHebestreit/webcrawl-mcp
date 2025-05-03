@@ -11,6 +11,7 @@ import { CrawlExecutionService } from '../services/crawlExecutionService';
 import { setupMcpRoutes } from '../routes/mcpRoutes';
 import { setupMcpStreamableRoutes } from '../routes/mcpStreamableRoutes';
 import { setupApiRoutes } from '../routes/apiRoutes';
+import { createLogger } from '../utils/logger';
 
 /**
  * Unified Server - Configures and manages the Express application
@@ -22,6 +23,7 @@ export class Server {
   private resourceController: ResourceController;
   private toolController: ToolController;
   private crawlExecutor: CrawlExecutionService;
+  private logger = createLogger('Server');
 
   constructor() {
     this.app = express();
@@ -96,11 +98,11 @@ export class Server {
     const serverPort = port || config.get('port');
 
     this.app.listen(serverPort, () => {
-      console.log(`${config.get('mcpName')} is running on port ${serverPort}`);
-      console.log(`MCP SSE endpoint (deprecated): http://localhost:${serverPort}/mcp/sse`);
-      console.log(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp/v2`);
-      console.log(`Health check endpoint: http://localhost:${serverPort}/api/health`);
-      console.log(`Version info endpoint: http://localhost:${serverPort}/api/version`);
+      this.logger.info(`${config.get('mcpName')} is running on port ${serverPort}`);
+      this.logger.info(`MCP SSE endpoint (deprecated): http://localhost:${serverPort}/mcp/sse`);
+      this.logger.info(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp/v2`);
+      this.logger.info(`Health check endpoint: http://localhost:${serverPort}/api/health`);
+      this.logger.info(`Version info endpoint: http://localhost:${serverPort}/api/version`);
     });
   }
 

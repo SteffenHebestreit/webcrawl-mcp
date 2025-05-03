@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import config from '../config';
 import { ToolConfig, ResourceConfig } from '../types/mcp';
+import { createLogger } from '../utils/logger';
 
 /**
  * A simple implementation of Model Context Protocol (MCP) server
@@ -9,6 +10,7 @@ import { ToolConfig, ResourceConfig } from '../types/mcp';
 export class SimpleMcpServer {
   private tools: ToolConfig<any, any>[] = [];
   private resources: ResourceConfig[] = [];
+  private logger = createLogger('SimpleMcpServer');
 
   constructor(config: any) {
     // No longer need to store config as a class property since we're importing it directly
@@ -33,7 +35,7 @@ export class SimpleMcpServer {
    */
   async handleHttpRequest(req: Request, res: Response): Promise<void> {
     try {
-      console.log('Handling MCP SSE request');
+      this.logger.info('Handling MCP SSE request');
 
       // Send initial connection success message
       this.sendSseMessage(res, {
@@ -55,11 +57,11 @@ export class SimpleMcpServer {
 
       // Set up error handling for client disconnect
       req.on('close', () => {
-        console.log('Client disconnected from SSE');
+        this.logger.info('Client disconnected from SSE');
       });
 
     } catch (error) {
-      console.error('Error in SSE handler:', error);
+      this.logger.error('Error in SSE handler:', error);
       this.sendSseMessage(res, {
         jsonrpc: '2.0',
         error: {
@@ -76,7 +78,7 @@ export class SimpleMcpServer {
    */
   async handleStreamableHttpRequest(req: Request, res: Response): Promise<void> {
     try {
-      console.log('Handling MCP Streamable HTTP request');
+      this.logger.info('Handling MCP Streamable HTTP request');
 
       // Send initial connection success message
       this.sendStreamableHttpMessage(res, {
@@ -98,11 +100,11 @@ export class SimpleMcpServer {
 
       // Set up error handling for client disconnect
       req.on('close', () => {
-        console.log('Client disconnected from Streamable HTTP');
+        this.logger.info('Client disconnected from Streamable HTTP');
       });
 
     } catch (error) {
-      console.error('Error in Streamable HTTP handler:', error);
+      this.logger.error('Error in Streamable HTTP handler:', error);
       this.sendStreamableHttpMessage(res, {
         jsonrpc: '2.0',
         error: {
@@ -120,7 +122,7 @@ export class SimpleMcpServer {
   private async handleJsonRpcRequest(request: any, res: Response, transport: 'sse' | 'streamable'): Promise<void> {
     const { method, params, id } = request;
     
-    console.log(`Handling JSON-RPC method: ${method} via ${transport}`);
+    this.logger.info(`Handling JSON-RPC method: ${method} via ${transport}`);
     
     switch (method) {
       case 'mcp.capabilities':
@@ -175,7 +177,7 @@ export class SimpleMcpServer {
    */
   private async handleToolUseRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { name, parameters } = params;
-    console.log(`Tool use request for ${name} with params:`, parameters);
+    this.logger.info(`Tool use request for ${name}`, parameters);
 
     try {
       const tool = this.tools.find(t => t.name === name);
@@ -190,7 +192,7 @@ export class SimpleMcpServer {
       const result = await tool.execute(validParams);
       this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
-      console.error(`Error executing tool ${name}:`, error);
+      this.logger.error(`Error executing tool ${name}:`, error);
       this.sendMessage(res, {
         jsonrpc: '2.0',
         error: {
@@ -207,7 +209,7 @@ export class SimpleMcpServer {
    */
   private async handleResourceListRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { name } = params;
-    console.log(`Resource list request for ${name}`);
+    this.logger.info(`Resource list request for ${name}`);
     
     try {
       const resource = this.resources.find(r => r.name === name);
@@ -216,7 +218,7 @@ export class SimpleMcpServer {
       const result = await resource.handlers.list();
       this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
-      console.error(`Error listing resource ${name}:`, error);
+      this.logger.error(`Error listing resource ${name}:`, error);
       this.sendMessage(res, {
         jsonrpc: '2.0',
         error: {
@@ -233,7 +235,7 @@ export class SimpleMcpServer {
    */
   private async handleResourceGetRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { uri } = params;
-    console.log(`Resource get request for ${uri}`);
+    this.logger.info(`Resource get request for ${uri}`);
     
     try {
       const resource = this.resources.find(r => r.uri === uri);
@@ -242,7 +244,7 @@ export class SimpleMcpServer {
       const result = await resource.handlers.get();
       this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
-      console.error(`Error getting resource at ${uri}:`, error);
+      this.logger.error(`Error getting resource at ${uri}:`, error);
       this.sendMessage(res, {
         jsonrpc: '2.0',
         error: {
@@ -273,7 +275,7 @@ export class SimpleMcpServer {
       res.write(`data: ${JSON.stringify(message)}\n\n`);
       res.flushHeaders();
     } catch (error) {
-      console.error('Error sending SSE message:', error);
+      this.logger.error('Error sending SSE message:', error);
     }
   }
   
@@ -289,7 +291,7 @@ export class SimpleMcpServer {
         (res as any).flush();
       }
     } catch (error) {
-      console.error('Error sending Streamable HTTP message:', error);
+      this.logger.error('Error sending Streamable HTTP message:', error);
     }
   }
 }

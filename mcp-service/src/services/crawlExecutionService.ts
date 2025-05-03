@@ -3,6 +3,7 @@ import path from 'path';
 import puppeteer, { Browser, Page } from 'puppeteer';
 import TurndownService from 'turndown';
 import { CrawlParams, CrawlWithMarkdownParams } from '../types/mcp';
+import { createLogger } from '../utils/logger';
 
 // Define the structure of the crawl result
 interface CrawlResult {
@@ -33,6 +34,7 @@ export class CrawlExecutionService {
     private browser: Browser | null = null;
     private tmpDir: string;
     private turndownService: TurndownService;
+    private logger = createLogger('CrawlExecutionService');
 
     constructor() {
         // Define temporary directory for screenshots and other artifacts
@@ -52,7 +54,7 @@ export class CrawlExecutionService {
         this.configureTurndown();
         
         // Ensure the temporary directory exists
-        this.ensureTmpDir().catch(console.error);
+        this.ensureTmpDir().catch(err => this.logger.error('Failed to create temp directory', err));
     }
 
     /**
@@ -83,9 +85,9 @@ export class CrawlExecutionService {
     private async ensureTmpDir(): Promise<void> {
         try {
             await fs.mkdir(this.tmpDir, { recursive: true });
-            console.log(`Temporary directory ensured at: ${this.tmpDir}`);
+            this.logger.info(`Temporary directory ensured at: ${this.tmpDir}`);
         } catch (error) {
-            console.error('Error creating temporary directory:', error);
+            this.logger.error('Error creating temporary directory:', error);
             throw new Error(`Failed to create temporary directory: ${error}`);
         }
     }
@@ -95,7 +97,7 @@ export class CrawlExecutionService {
      */
     private async getBrowser(): Promise<Browser> {
         if (!this.browser) {
-            console.log('Launching new browser instance');
+            this.logger.info('Launching new browser instance');
             
             const launchOptions = {
                 headless: true, // Use boolean instead of string
@@ -114,7 +116,7 @@ export class CrawlExecutionService {
             
             // Handle unexpected browser closure
             this.browser.on('disconnected', () => {
-                console.log('Browser disconnected');
+                this.logger.info('Browser disconnected');
                 this.browser = null;
             });
         }
@@ -169,10 +171,10 @@ export class CrawlExecutionService {
                 path: screenshotPath,
                 fullPage: true,
             });
-            console.log(`Screenshot saved to ${screenshotPath}`);
+            this.logger.info(`Screenshot saved to ${screenshotPath}`);
             return screenshotPath;
         } catch (error) {
-            console.error(`Failed to take screenshot: ${error}`);
+            this.logger.error(`Failed to take screenshot:`, error);
             return '';
         }
     }
@@ -248,8 +250,8 @@ export class CrawlExecutionService {
                         urls.push(absoluteUrl);
                     }
                 } catch (e) {
-                    // Ignore invalid URLs
-                    console.warn(`Skipping invalid URL: ${href}`);
+                    // Skip invalid URLs silently - we can't use our logger in browser context
+                    // Browser-side logs are not helpful for server-side debugging
                 }
             });
             
@@ -322,13 +324,13 @@ export class CrawlExecutionService {
         
         // Stop if we've reached the maximum number of pages
         if (visitedUrls.size >= maxPages) {
-            console.log(`Reached maximum number of pages (${maxPages}). Stopping crawl.`);
+            this.logger.info(`Reached maximum number of pages (${maxPages}). Stopping crawl.`);
             return result;
         }
         
         // Avoid crawling the same URL twice
         if (visitedUrls.has(url)) {
-            console.log(`Already visited ${url}. Skipping.`);
+            this.logger.info(`Already visited ${url}. Skipping.`);
             return result;
         }
         
@@ -347,7 +349,7 @@ export class CrawlExecutionService {
             }
             
             // Navigate to URL
-            console.log(`Navigating to ${url} at depth ${currentDepth}`);
+            this.logger.info(`Navigating to ${url} at depth ${currentDepth}`);
             await page.goto(url, { waitUntil: 'domcontentloaded' });
             
             // Wait for the page to load properly
@@ -358,7 +360,7 @@ export class CrawlExecutionService {
             visitedUrls.add(url);
             
             // Extract text content
-            console.log(`Extracting text from ${url}`);
+            this.logger.info(`Extracting text from ${url}`);
             const text = await this.extractText(page);
             result.text = text;
             
@@ -367,7 +369,7 @@ export class CrawlExecutionService {
             result.markdown = this.turndownService.turndown(html);
             
             // Extract tables
-            console.log(`Extracting tables from ${url}`);
+            this.logger.info(`Extracting tables from ${url}`);
             result.media.tables = await this.extractTables(page);
             
             // Take screenshot if configured
@@ -381,7 +383,7 @@ export class CrawlExecutionService {
             // If we haven't reached max depth, get links for next pages
             if (currentDepth < maxDepth) {
                 const nextUrls = await this.getNextUrls(page, url, maxDepth - currentDepth, config.strategy);
-                console.log(`Found ${nextUrls.length} links to crawl at depth ${currentDepth + 1}`);
+                this.logger.info(`Found ${nextUrls.length} links to crawl at depth ${currentDepth + 1}`);
                 
                 // Crawl next pages based on strategy
                 for (const nextUrl of nextUrls) {
@@ -420,7 +422,7 @@ export class CrawlExecutionService {
             return result;
             
         } catch (error: any) {
-            console.error(`Error while crawling ${url}:`, error);
+            this.logger.error(`Error while crawling ${url}:`, error);
             return {
                 ...result,
                 success: false,
@@ -444,7 +446,7 @@ export class CrawlExecutionService {
      * Public method to initiate a crawl operation
      */
     public async executeCrawl(url: string, options: CrawlParams | CrawlWithMarkdownParams): Promise<CrawlResult> {
-        console.log(`Initiating crawl for URL: ${url} with options:`, options);
+        this.logger.info(`Initiating crawl for URL: ${url}`, options);
         
         try {
             // Ensure temp directory exists
@@ -475,11 +477,11 @@ export class CrawlExecutionService {
                 }
             };
             
-            console.log(`Crawl completed for ${url}. Success: ${result.success}`);
+            this.logger.info(`Crawl completed for ${url}. Success: ${result.success}`);
             return result;
             
         } catch (error: any) {
-            console.error(`Error during crawl execution for ${url}:`, error);
+            this.logger.error(`Error during crawl execution for ${url}:`, error);
             
             // Return error response
             return {

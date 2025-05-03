@@ -1,16 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { SimpleMcpServer } from '../mcp/SimpleMcpServer';
 import config from '../config';
+import { createLogger } from '../utils/logger';
 
 /**
  * Set up routes for MCP using the modern Streamable HTTP approach instead of SSE
  */
 export function setupMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
   const router = Router();
+  const logger = createLogger('MCP-Streamable');
 
   // Set up the primary MCP endpoint for JSON-RPC over Streamable HTTP
   router.post('/', async (req: Request, res: Response) => {
-    console.log('Received MCP Streamable HTTP request');
+    logger.info('Received MCP Streamable HTTP request');
 
     // Set headers for Streamable HTTP
     res.setHeader('Content-Type', 'application/json');
@@ -23,14 +25,14 @@ export function setupMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
 
       // Handle client disconnect
       req.on('close', () => {
-        console.log('Client disconnected from MCP Streamable HTTP');
+        logger.info('Client disconnected from MCP Streamable HTTP');
         // Ensure response is properly closed
         if (!res.writableEnded) {
           res.end();
         }
       });
     } catch (error) {
-      console.error('Error handling MCP Streamable HTTP request:', error);
+      logger.error('Error handling MCP Streamable HTTP request:', error);
       
       // If headers haven't been sent, send proper error response
       if (!res.headersSent) {
@@ -56,7 +58,7 @@ export function setupMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
           res.write(errorChunk);
           res.end();
         } catch (e) {
-          console.error('Failed to write error chunk:', e);
+          logger.error('Failed to write error chunk:', e);
           res.end();
         }
       }

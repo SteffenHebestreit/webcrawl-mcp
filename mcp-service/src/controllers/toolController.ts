@@ -8,12 +8,14 @@ import {
   CrawlWithMarkdownResponse,
   ToolConfig
 } from '../types/mcp';
+import { createLogger } from '../utils/logger';
 
 /**
  * Controller for handling MCP tool operations
  */
 export class ToolController {
   private crawlExecutor: CrawlExecutionService;
+  private logger = createLogger('ToolController');
 
   constructor(config: any, crawlExecutor: CrawlExecutionService) {
     this.crawlExecutor = crawlExecutor;
@@ -78,7 +80,7 @@ export class ToolController {
    * Execute the basic crawl operation using CrawlExecutionService
    */
   private async executeCrawl(params: CrawlParams): Promise<CrawlResponse> {
-    console.log('Executing crawl with params:', params);
+    this.logger.info('Executing crawl with params:', params);
     try {
       const result = await this.crawlExecutor.executeCrawl(params.url, params);
 
@@ -90,7 +92,7 @@ export class ToolController {
         error: result.error
       };
     } catch (error: any) {
-      console.error('Error in ToolController executeCrawl:', error);
+      this.logger.error('Error in ToolController executeCrawl:', error);
       return {
         success: false,
         url: params.url,
@@ -105,7 +107,7 @@ export class ToolController {
    * Execute the markdown crawl operation using CrawlExecutionService
    */
   private async executeCrawlWithMarkdown(params: CrawlWithMarkdownParams): Promise<CrawlWithMarkdownResponse> {
-    console.log('Executing crawlWithMarkdown with params:', params);
+    this.logger.info('Executing crawlWithMarkdown with params:', params);
     try {
       const result = await this.crawlExecutor.executeCrawl(params.url, params);
 
@@ -116,7 +118,7 @@ export class ToolController {
         error: result.error
       };
     } catch (error: any) {
-      console.error('Error in ToolController executeCrawlWithMarkdown:', error);
+      this.logger.error('Error in ToolController executeCrawlWithMarkdown:', error);
       return {
         success: false,
         url: params.url,

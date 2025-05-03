@@ -1,13 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { SimpleMcpServer } from '../mcp/SimpleMcpServer';
 import config from '../config';
+import { createLogger } from '../utils/logger';
 
 export function setupMcpRoutes(mcpServer: SimpleMcpServer): Router {
   const router = Router();
+  const logger = createLogger('MCP-Routes');
 
   // Set up the SSE endpoint for MCP
   router.post('/sse', async (req: Request, res: Response) => {
-    console.log('Received MCP SSE request');
+    logger.info('Received MCP SSE request');
 
     // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
@@ -21,12 +23,12 @@ export function setupMcpRoutes(mcpServer: SimpleMcpServer): Router {
 
       // Keep connection open for SSE, but handle client close
       req.on('close', () => {
-        console.log('Client disconnected from MCP SSE');
+        logger.info('Client disconnected from MCP SSE');
         // Perform any necessary cleanup here
         res.end(); // Ensure response is ended when client disconnects
       });
     } catch (error) {
-      console.error('Error handling MCP SSE request:', error);
+      logger.error('Error handling MCP SSE request:', error);
       // Check if headers were already sent before sending error
       if (!res.headersSent) {
         res.status(500).json({
@@ -46,6 +48,7 @@ export function setupMcpRoutes(mcpServer: SimpleMcpServer): Router {
 
   // Handle GET requests to the SSE endpoint
   router.get('/sse', (req: Request, res: Response) => {
+    logger.warn('Invalid GET request received at MCP SSE endpoint');
     res.status(405).json({
       jsonrpc: "2.0",
       error: {
