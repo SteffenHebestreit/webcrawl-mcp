@@ -19,7 +19,7 @@
   "author": "Steffen Hebestreit",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.11.0",
     "@types/joi": "^17.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

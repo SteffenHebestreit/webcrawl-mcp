@@ -29,14 +29,14 @@ export class SimpleMcpServer {
   }
 
   /**
-   * Handle HTTP request for the MCP SSE connection
+   * Handle HTTP request for the MCP SSE connection (legacy)
    */
   async handleHttpRequest(req: Request, res: Response): Promise<void> {
     try {
       console.log('Handling MCP SSE request');
 
       // Send initial connection success message
-      this.sendMessage(res, {
+      this.sendSseMessage(res, {
         jsonrpc: '2.0',
         result: {
           mcp: {
@@ -50,7 +50,7 @@ export class SimpleMcpServer {
       
       // Process the input if present
       if (req.body && req.body.jsonrpc === '2.0') {
-        await this.handleJsonRpcRequest(req.body, res);
+        await this.handleJsonRpcRequest(req.body, res, 'sse');
       }
 
       // Set up error handling for client disconnect
@@ -60,7 +60,50 @@ export class SimpleMcpServer {
 
     } catch (error) {
       console.error('Error in SSE handler:', error);
-      this.sendMessage(res, {
+      this.sendSseMessage(res, {
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal server error',
+        },
+        id: null
+      });
+    }
+  }
+  
+  /**
+   * Handle HTTP request for the MCP Streamable HTTP endpoint (modern approach)
+   */
+  async handleStreamableHttpRequest(req: Request, res: Response): Promise<void> {
+    try {
+      console.log('Handling MCP Streamable HTTP request');
+
+      // Send initial connection success message
+      this.sendStreamableHttpMessage(res, {
+        jsonrpc: '2.0',
+        result: {
+          mcp: {
+            name: config.get('mcpName'),
+            version: config.get('mcpVersion'),
+            description: config.get('mcpDescription')
+          }
+        },
+        id: null
+      });
+      
+      // Process the input if present
+      if (req.body && req.body.jsonrpc === '2.0') {
+        await this.handleJsonRpcRequest(req.body, res, 'streamable');
+      }
+
+      // Set up error handling for client disconnect
+      req.on('close', () => {
+        console.log('Client disconnected from Streamable HTTP');
+      });
+
+    } catch (error) {
+      console.error('Error in Streamable HTTP handler:', error);
+      this.sendStreamableHttpMessage(res, {
         jsonrpc: '2.0',
         error: {
           code: -32603,
@@ -74,26 +117,26 @@ export class SimpleMcpServer {
   /**
    * Handle JSON-RPC request
    */
-  private async handleJsonRpcRequest(request: any, res: Response): Promise<void> {
+  private async handleJsonRpcRequest(request: any, res: Response, transport: 'sse' | 'streamable'): Promise<void> {
     const { method, params, id } = request;
     
-    console.log(`Handling JSON-RPC method: ${method}`);
+    console.log(`Handling JSON-RPC method: ${method} via ${transport}`);
     
     switch (method) {
       case 'mcp.capabilities':
-        this.handleCapabilitiesRequest(res, id);
+        this.handleCapabilitiesRequest(res, id, transport);
         break;
         
       case 'mcp.tool.use':
-        await this.handleToolUseRequest(params, res, id);
+        await this.handleToolUseRequest(params, res, id, transport);
         break;
         
       case 'mcp.resource.list':
-        await this.handleResourceListRequest(params, res, id);
+        await this.handleResourceListRequest(params, res, id, transport);
         break;
         
       case 'mcp.resource.get':
-        await this.handleResourceGetRequest(params, res, id);
+        await this.handleResourceGetRequest(params, res, id, transport);
         break;
         
       default:
@@ -104,14 +147,14 @@ export class SimpleMcpServer {
             message: `Method not found: ${method}`,
           },
           id
-        });
+        }, transport);
     }
   }
 
   /**
    * Handle capabilities request
    */
-  private handleCapabilitiesRequest(res: Response, id: string | number): void {
+  private handleCapabilitiesRequest(res: Response, id: string | number, transport: 'sse' | 'streamable'): void {
     const tools = this.tools.map(t => ({
       name: t.name,
       description: t.description,
@@ -124,13 +167,13 @@ export class SimpleMcpServer {
       jsonrpc: '2.0',
       result: { tools, resources },
       id
-    });
+    }, transport);
   }
 
   /**
    * Handle tool use request
    */
-  private async handleToolUseRequest(params: any, res: Response, id: string | number): Promise<void> {
+  private async handleToolUseRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { name, parameters } = params;
     console.log(`Tool use request for ${name} with params:`, parameters);
 
@@ -145,7 +188,7 @@ export class SimpleMcpServer {
       }
 
       const result = await tool.execute(validParams);
-      this.sendMessage(res, { jsonrpc: '2.0', result, id });
+      this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
       console.error(`Error executing tool ${name}:`, error);
       this.sendMessage(res, {
@@ -155,14 +198,14 @@ export class SimpleMcpServer {
           message: error.message || `Error executing tool ${name}`,
         },
         id
-      });
+      }, transport);
     }
   }
 
   /**
    * Handle resource list request
    */
-  private async handleResourceListRequest(params: any, res: Response, id: string | number): Promise<void> {
+  private async handleResourceListRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { name } = params;
     console.log(`Resource list request for ${name}`);
     
@@ -171,7 +214,7 @@ export class SimpleMcpServer {
       if (!resource) throw new Error(`Resource not found: ${name}`);
       if (!resource.handlers.list) throw new Error(`List handler not defined for resource: ${name}`);
       const result = await resource.handlers.list();
-      this.sendMessage(res, { jsonrpc: '2.0', result, id });
+      this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
       console.error(`Error listing resource ${name}:`, error);
       this.sendMessage(res, {
@@ -181,14 +224,14 @@ export class SimpleMcpServer {
           message: error.message || `Error listing resource ${name}`,
         },
         id
-      });
+      }, transport);
     }
   }
 
   /**
    * Handle resource get request
    */
-  private async handleResourceGetRequest(params: any, res: Response, id: string | number): Promise<void> {
+  private async handleResourceGetRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable'): Promise<void> {
     const { uri } = params;
     console.log(`Resource get request for ${uri}`);
     
@@ -197,7 +240,7 @@ export class SimpleMcpServer {
       if (!resource) throw new Error(`Resource not found at URI: ${uri}`);
       if (!resource.handlers.get) throw new Error(`Get handler not defined for URI: ${uri}`);
       const result = await resource.handlers.get();
-      this.sendMessage(res, { jsonrpc: '2.0', result, id });
+      this.sendMessage(res, { jsonrpc: '2.0', result, id }, transport);
     } catch (error: any) {
       console.error(`Error getting resource at ${uri}:`, error);
       this.sendMessage(res, {
@@ -207,19 +250,46 @@ export class SimpleMcpServer {
           message: error.message || `Error getting resource at ${uri}`,
         },
         id
-      });
+      }, transport);
     }
   }
 
   /**
-   * Send SSE message to the client
+   * Send message to the client using the appropriate transport
    */
-  private sendMessage(res: Response, message: any): void {
+  private sendMessage(res: Response, message: any, transport: 'sse' | 'streamable'): void {
+    if (transport === 'sse') {
+      this.sendSseMessage(res, message);
+    } else {
+      this.sendStreamableHttpMessage(res, message);
+    }
+  }
+
+  /**
+   * Send SSE message to the client (legacy transport)
+   */
+  private sendSseMessage(res: Response, message: any): void {
     try {
       res.write(`data: ${JSON.stringify(message)}\n\n`);
       res.flushHeaders();
     } catch (error) {
       console.error('Error sending SSE message:', error);
+    }
+  }
+  
+  /**
+   * Send Streamable HTTP message to the client (modern transport)
+   */
+  private sendStreamableHttpMessage(res: Response, message: any): void {
+    try {
+      // Send JSON chunk with newline to make it easier to process client-side
+      res.write(JSON.stringify(message) + '\n');
+      // Flush to ensure the chunk is sent immediately
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
+    } catch (error) {
+      console.error('Error sending Streamable HTTP message:', error);
     }
   }
 }

@@ -46,7 +46,8 @@ Folder Structure
         │   └── SimpleMcpServer.ts
         ├── routes/             # Route definitions
         │   ├── apiRoutes.ts    # General API endpoints
-        │   └── mcpRoutes.ts    # MCP-specific endpoints
+        │   ├── mcpRoutes.ts    # MCP-specific endpoints (SSE)
+        │   └── mcpStreamableRoutes.ts # MCP endpoints with Streamable HTTP
         ├── server/             # Unified server implementation
         │   └── server.ts       # Express and MCP server integration
         ├── services/           # Business logic services
@@ -79,13 +80,25 @@ docker-compose up --build
    npm start
    ```
 
-# API Usage Examples
+# API Endpoints
+
+The server provides multiple endpoints:
+
+- **MCP Streamable HTTP** (Recommended): `/mcp/v2` - Modern JSON-RPC over HTTP with streaming support
+- **MCP SSE** (Deprecated): `/mcp/sse` - Legacy Server-Sent Events endpoint
+- **API Endpoints**: `/api/health`, `/api/version` - General server information
 
 See detailed API documentation in [MCP_API.md](MCP_API.md).
 
-### Capabilities
+# Testing Endpoints
+
+## MCP Streamable HTTP Endpoint (Recommended)
+
+The modern approach recommended by the MCP specification.
+
+### Capabilities Request
 ```bash
-curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
+curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
@@ -95,9 +108,50 @@ curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
     }'
 ```
 
-Response:
-```json
-{"jsonrpc":"2.0","result":{"tools":[{"name":"crawl",...}],"resources":[{"name":"info","uri":"info://about"}]},"id":1}
+### Use Tool (crawl)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "crawl",
+        "parameters": { "url": "https://example.com", "maxPages": 1 }
+      },
+      "id": 2
+    }'
+```
+
+### Use Tool (crawlWithMarkdown)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "crawlWithMarkdown",
+        "parameters": { "url": "https://example.com", "query": "What is this site about?" }
+      },
+      "id": 3
+    }'
+```
+
+## MCP SSE Endpoint (Deprecated)
+
+The legacy approach that uses Server-Sent Events (SSE).
+
+### Capabilities Request
+```bash
+curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.capabilities",
+      "params": {},
+      "id": 1
+    }'
 ```
 
 ### Use Tool (crawl)
@@ -115,10 +169,7 @@ curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
     }'
 ```
 
-Response:
-```json
-{"jsonrpc":"2.0","result":{"success":true,"url":"https://example.com","text":"<html>..."},"id":2}
-```
+## API Endpoints
 
 ### Health Check
 ```bash
@@ -164,6 +215,7 @@ Key Components
 - **SimpleMcpServer**: Implements MCP discovery and tool invocation logic.
 - **Controllers**: `toolController` and `resourceController` for handling business logic.
 - **Configuration**: Centralized configuration system with module-specific settings.
+- **MCP Transport**: Supports both modern Streamable HTTP and legacy SSE transport methods.
 
 Customization
 -------------
@@ -176,7 +228,8 @@ Customization
 graph LR
   Client --> Server
   Server --> Router["Routes (API/MCP)"]
-  Router --> SimpleMcpServer
+  Router --> |SSE| SimpleMcpServer
+  Router --> |Streamable HTTP| SimpleMcpServer
   Router --> ApiControllers
   SimpleMcpServer --> Controllers
   Controllers --> CrawlExecutionService
@@ -188,6 +241,7 @@ graph LR
 - [Code Structure](CODE_STRUCTURE.md): Detailed explanations of source files.
 - [MCP API Reference](MCP_API.md): Endpoint specs and JSON-RPC methods.
 - [Model Context Protocol SDK](https://www.npmjs.com/package/@modelcontextprotocol/sdk): Official SDK documentation.
+- [MCP Transport Models](https://github.com/modelcontextprotocol/typescript-sdk#transport): Details on SSE vs Streamable HTTP.
 
 ## License
 

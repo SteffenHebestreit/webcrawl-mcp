@@ -9,6 +9,7 @@ import { ResourceController } from '../controllers/resourceController';
 import { ToolController } from '../controllers/toolController';
 import { CrawlExecutionService } from '../services/crawlExecutionService';
 import { setupMcpRoutes } from '../routes/mcpRoutes';
+import { setupMcpStreamableRoutes } from '../routes/mcpStreamableRoutes';
 import { setupApiRoutes } from '../routes/apiRoutes';
 
 /**
@@ -77,8 +78,9 @@ export class Server {
     // Mount API routes
     this.app.use('/api', setupApiRoutes());
     
-    // Mount MCP routes
-    this.app.use('/mcp', setupMcpRoutes(this.mcpServer));
+    // Mount MCP routes - both legacy SSE and modern Streamable HTTP
+    this.app.use('/mcp', setupMcpRoutes(this.mcpServer)); // Legacy SSE at /mcp/sse
+    this.app.use('/mcp/v2', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp/v2
     
     // Optional: Add a 404 handler for undefined routes
     this.app.use((req: Request, res: Response) => {
@@ -95,9 +97,10 @@ export class Server {
 
     this.app.listen(serverPort, () => {
       console.log(`${config.get('mcpName')} is running on port ${serverPort}`);
-      console.log(`MCP SSE endpoint available at: http://localhost:${serverPort}/mcp/sse`);
-      console.log(`Health check endpoint available at: http://localhost:${serverPort}/api/health`);
-      console.log(`Version info available at: http://localhost:${serverPort}/api/version`);
+      console.log(`MCP SSE endpoint (deprecated): http://localhost:${serverPort}/mcp/sse`);
+      console.log(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp/v2`);
+      console.log(`Health check endpoint: http://localhost:${serverPort}/api/health`);
+      console.log(`Version info endpoint: http://localhost:${serverPort}/api/version`);
     });
   }
 
