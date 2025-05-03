@@ -31,9 +31,13 @@ export const config = {
    * @returns Complete configuration object
    */
   getAll: function(): Record<string, any> {
-    const configCopy = { ...this };
-    delete configCopy.get;
-    delete configCopy.getAll;
+    // Create a new object with only the configuration properties, 
+    // excluding the function properties
+    const configCopy: Record<string, any> = {};
+    
+    // Copy all properties from the config modules
+    Object.assign(configCopy, appConfig, mcpConfig, securityConfig, crawlConfig);
+    
     return configCopy;
   }
 };
