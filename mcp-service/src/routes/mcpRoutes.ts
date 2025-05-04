@@ -8,7 +8,7 @@ export function setupMcpRoutes(mcpServer: SimpleMcpServer): Router {
   const logger = createLogger('MCP-Routes');
 
   // Set up the SSE endpoint for MCP
-  router.post('/sse', async (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response) => {
     logger.info('Received MCP SSE request');
 
     // Set headers for SSE
@@ -47,7 +47,7 @@ export function setupMcpRoutes(mcpServer: SimpleMcpServer): Router {
   });
 
   // Handle GET requests to the SSE endpoint
-  router.get('/sse', (req: Request, res: Response) => {
+  router.get('/', (req: Request, res: Response) => {
     logger.warn('Invalid GET request received at MCP SSE endpoint');
     res.status(405).json({
       jsonrpc: "2.0",
