@@ -32,15 +32,20 @@ services:
 
   mcp-server:
     build:
-      context: ./mcp-service
-      dockerfile: Dockerfile
+      context: .  # Use the root directory as build context
+      dockerfile: ./mcp-service/Dockerfile
       target: production  # Use the production stage from multi-stage build
     container_name: mcp-server
     restart: unless-stopped
+    ports:
+      - "3000:11235"  # Map container port 11235 to host port 3000
+    env_file:
+      - ./mcp-config/.env
     environment:
       - PORT=11235
       - NODE_ENV=production
       - LOG_LEVEL=info
+      - LOG_DIR=/app/logs
       - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-10mb}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-900000}
@@ -60,6 +65,8 @@ services:
     networks:
       - web
     volumes:
+      - ./mcp-config:/app/mcp-config
+      - ./mcp-config/services:/app/dist/services # Mount services dynamically for development
       - mcp_logs:/app/logs
     # Add security options
     security_opt:

@@ -45,10 +45,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM base AS builder
 
 WORKDIR /app
-COPY package*.json ./
+
+# Copy package.json files
+COPY mcp-service/package*.json ./
+
 # Install all dependencies, including devDependencies for build
 RUN npm install --verbose
-COPY . .
+
+# Copy all source files
+COPY mcp-service/ ./
+# Copy the services from mcp-config during build
+COPY mcp-config/services/ ./src/services/
+
 RUN npm run build
 
 # --- Production Stage ---
@@ -77,6 +85,9 @@ RUN npx puppeteer browsers install chrome
 
 # Create cache directory and set ownership
 RUN mkdir -p ${PUPPETEER_CACHE_DIR} && chown -R appuser:appgroup /app
+
+# Create directory for external config
+RUN mkdir -p /app/mcp-config && chown -R appuser:appgroup /app/mcp-config
 
 # Allow execution of chrome
 RUN chmod -R o+rwx /app/.cache/puppeteer

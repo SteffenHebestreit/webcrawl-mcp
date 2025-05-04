@@ -1,0 +1,118 @@
+{
+  "crawl": {
+    "name": "crawl",
+    "description": "Crawl a website and extract text content and tables.",
+    "serviceName": "crawl",
+    "methodName": "executeCrawl",
+    "parameterDescription": "URL to crawl along with optional crawling parameters like maxPages, depth, strategy, etc.",
+    "returnDescription": "Object containing success status, original URL, extracted text content, optional tables, and optional error message.",
+    "enabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "maxPages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["bfs", "dfs", "bestFirst"]
+        },
+        "captureNetworkTraffic": {
+          "type": "boolean"
+        },
+        "captureScreenshots": {
+          "type": "boolean"
+        },
+        "waitTime": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["url"]
+    },
+    "returns": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tables": {
+          "type": "array"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "url", "text"]
+    }
+  },
+  "crawlWithMarkdown": {
+    "name": "crawlWithMarkdown",
+    "description": "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
+    "serviceName": "crawl",
+    "methodName": "executeCrawlWithMarkdown",
+    "parameterDescription": "URL to crawl, optional crawling parameters, and an optional query.",
+    "returnDescription": "Object containing success status, original URL, markdown content, and optional error message.",
+    "enabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "maxPages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["bfs", "dfs", "bestFirst"]
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": ["url"]
+    },
+    "returns": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "markdown": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "url", "markdown"]
+    }
+  }
+}

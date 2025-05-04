@@ -42,8 +42,8 @@ Please be respectful and considerate of others when contributing to this project
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/crawl4ai-server.git
-   cd crawl4ai-server
+   git clone https://github.com/yourusername/mcp-server-template.git
+   cd mcp-server-template
    ```
 
 2. Install dependencies

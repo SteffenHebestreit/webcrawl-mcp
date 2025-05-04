@@ -1,21 +1,8 @@
-import { Server } from './server/server';
-import config from './config';
-
 /**
- * Bootstrap the application
+ * Main entry point for the MCP Service
+ * Re-exports the core application from @core/index.ts
  */
-function bootstrap() {
-  // Create and start the unified server
-  const server = new Server();
-  const port = config.get('port');
-  server.start(port);
 
-  // Export app for testing purposes
-  return server.getApp();
-}
-
-// Bootstrap the application
-const app = bootstrap();
-
-// Export app for testing purposes
+// Re-export the app from the core implementation
+import app from './@core/index.js';
 export default app;
