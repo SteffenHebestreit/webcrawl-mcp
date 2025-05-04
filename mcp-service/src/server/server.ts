@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import morgan from 'morgan';
 import config from '../config';
 import { SimpleMcpServer } from '../mcp/SimpleMcpServer';
 import { ResourceController } from '../controllers/resourceController';
@@ -52,6 +53,9 @@ export class Server {
     this.app.use(requestLoggerMiddleware);
     // Security headers
     this.app.use(helmet());
+
+    // Logging
+    this.app.use(morgan('combined')); // Or 'dev' for shorter logs
 
     // Parse JSON bodies with dynamic size limit
     this.app.use(express.json({ limit: config.get('maxRequestSize') }));
