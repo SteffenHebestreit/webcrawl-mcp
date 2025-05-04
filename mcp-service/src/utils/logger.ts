@@ -53,19 +53,17 @@ function shouldLog(level: LogLevel): boolean {
 function formatLogMessage(level: string, message: string, context?: any): string {
   const timestamp = new Date().toISOString();
   const levelUpper = level.toUpperCase();
-  
-  let formattedMessage = `${COLORS.timestamp}${timestamp}${COLORS.reset} ${COLORS[level as keyof typeof COLORS]}[${levelUpper}]${COLORS.reset} ${message}`;
-  
+  const color = COLORS[level as keyof typeof COLORS] || '';
+  const logObj: any = {
+    time: timestamp,
+    type: levelUpper,
+    color,
+    message,
+  };
   if (context) {
-    try {
-      const contextStr = typeof context === 'string' ? context : JSON.stringify(context, null, 2);
-      formattedMessage += `\n${contextStr}`;
-    } catch (error) {
-      formattedMessage += `\n[Context serialization failed]`;
-    }
+    logObj.context = context;
   }
-  
-  return formattedMessage;
+  return JSON.stringify(logObj);
 }
 
 /**
@@ -79,6 +77,10 @@ export class Logger {
    */
   constructor(source?: string) {
     this.source = source;
+    this.debug = this.debug.bind(this);
+    this.info = this.info.bind(this);
+    this.warn = this.warn.bind(this);
+    this.error = this.error.bind(this);
   }
 
   /**

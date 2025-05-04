@@ -6,7 +6,6 @@ export function setupApiRoutes(): Router {
 
   // Add a basic health check endpoint
   router.get('/health', (req: Request, res: Response) => {
-    // TODO: Add more comprehensive health checks (e.g., Python availability)
     res.status(200).send('OK');
   });
 
