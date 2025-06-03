@@ -188,7 +188,7 @@ curl http://localhost:${PORT:-3000}/api/version
 
 Response:
 ```json
-{"name":"Crawl4AI-MCP","version":"1.0.0","description":"MCP Server for Crawl4AI"}
+{"name":"webcrawl-mcp","version":"1.0.0","description":"MCP Server for scrape websites"}
 ```
 
 Environment Variables
