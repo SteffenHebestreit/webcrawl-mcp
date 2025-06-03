@@ -47,7 +47,7 @@ export class ResourceController {
           uri: "info://about",
           text: `# ${serverName} v${version}\n\n` +
                 `${description}\n\n` +
-                "This MCP server provides web crawling capabilities using Crawl4AI. " +
+                "This MCP server provides web crawling capabilities for AI agents. " +
                 "You can use the following tools:\n\n" +
                 "- `crawl`: Crawl a website and get structured data back\n" +
                 "- `crawlWithMarkdown`: Crawl a website and get markdown-formatted content\n\n" +

@@ -77,7 +77,8 @@ MCP makes it easy to integrate external services (e.g., web crawlers) into LLM w
 
 ## API Endpoints
 
-- **`/mcp/sse`**: MCP endpoint for Server-Sent Events communication
+- **`/mcp/v2`**: Modern MCP endpoint using Streamable HTTP (recommended)
+- **`/mcp/sse`**: Legacy MCP endpoint for Server-Sent Events communication
 - **`/api/health`**: Health check endpoint
 - **`/api/version`**: Version information endpoint
 
