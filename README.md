@@ -213,6 +213,63 @@ Response:
 {"name":"webcrawl-mcp","version":"1.0.0","description":"MCP Server for scrape websites"}
 ```
 
+### List Available Tools
+```bash
+curl http://localhost:${PORT:-3000}/api/tools
+```
+
+Response:
+```json
+{
+  "success": true,
+  "tools": [
+    {
+      "name": "crawl",
+      "description": "Crawl a website and extract text content and tables.",
+      "parameterDescription": "URL to crawl along with optional crawling parameters like maxPages, depth, strategy, etc.",
+      "returnDescription": "Object containing success status, original URL, extracted text content, optional tables, and optional error message.",
+      "endpoint": "/api/tools/crawl"
+    },
+    {
+      "name": "crawlWithMarkdown", 
+      "description": "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
+      "parameterDescription": "URL to crawl, optional crawling parameters, and an optional query.",
+      "returnDescription": "Object containing success status, original URL, markdown content, and optional error message.",
+      "endpoint": "/api/tools/crawlWithMarkdown"
+    }
+  ]
+}
+```
+
+### Direct Tool Execution
+
+#### Crawl Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/crawl \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "maxPages": 3,
+    "depth": 1,
+    "strategy": "bfs",
+    "captureScreenshots": true,
+    "captureNetworkTraffic": false,
+    "waitTime": 2000
+  }'
+```
+
+#### Crawl with Markdown Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/crawlWithMarkdown \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "query": "What is this site about?",
+    "maxPages": 2,
+    "depth": 1
+  }'
+```
+
 Environment Variables
 ---------------------
 - `PORT` (default: 3000): Port for the MCP server.

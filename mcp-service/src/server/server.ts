@@ -105,6 +105,9 @@ export class Server {
       this.logger.info(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp`);
       this.logger.info(`Health check endpoint: http://localhost:${serverPort}/api/health`);
       this.logger.info(`Version info endpoint: http://localhost:${serverPort}/api/version`);
+      this.logger.info(`Tools listing endpoint: http://localhost:${serverPort}/api/tools`);
+      this.logger.info(`Direct crawl tool endpoint: http://localhost:${serverPort}/api/tools/crawl`);
+      this.logger.info(`Direct markdown crawl endpoint: http://localhost:${serverPort}/api/tools/crawlWithMarkdown`);
     });
   }
 

@@ -97,5 +97,8 @@ MCP makes it easy to integrate external services (e.g., web crawlers) into LLM w
 - **`/mcp/sse`**: Legacy MCP endpoint for Server-Sent Events communication
 - **`/api/health`**: Health check endpoint
 - **`/api/version`**: Version information endpoint
+- **`/api/tools`**: List available tools and their descriptions
+- **`/api/tools/crawl`**: Direct access to crawl tool (POST)
+- **`/api/tools/crawlWithMarkdown`**: Direct access to markdown crawl tool (POST)
 
 For detailed API specs, see `MCP_API.md`.
