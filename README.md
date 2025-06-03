@@ -194,11 +194,18 @@ Response:
 Environment Variables
 ---------------------
 - `PORT` (default: 3000): Port for the MCP server.
-- `MAX_REQUEST_SIZE` (default: `10mb`): Maximum HTTP payload size.
-- `CORS_ORIGINS` (default: `*`): Allowed origins for CORS.
-- `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`, `CACHE_TTL`: Rate limiting and cache settings.
+- `NODE_ENV` (default: development): Environment mode (development or production).
 - `MCP_NAME`, `MCP_VERSION`, `MCP_DESCRIPTION`: MCP server identification.
-- `CRAWL_DEFAULT_MAX_PAGES`, `CRAWL_DEFAULT_DEPTH`: Default crawling settings.
+- `CRAWL_DEFAULT_MAX_PAGES` (default: 10): Default maximum pages to crawl.
+- `CRAWL_DEFAULT_DEPTH` (default: 3): Default crawl depth.
+- `CRAWL_DEFAULT_STRATEGY` (default: bfs): Default crawl strategy (bfs|dfs|bestFirst).
+- `CRAWL_DEFAULT_WAIT_TIME` (default: 1000): Default wait time in ms between requests.
+- `LOG_LEVEL` (default: info): Logging level (debug|info|warn|error).
+- `CACHE_TTL` (default: 3600): Cache TTL in seconds.
+- `MAX_REQUEST_SIZE` (default: 10mb): Maximum HTTP payload size.
+- `CORS_ORIGINS` (default: *): Allowed origins for CORS.
+- `RATE_LIMIT_WINDOW` (default: 900000): Rate limit window in milliseconds (15 minutes).
+- `RATE_LIMIT_MAX_REQUESTS` (default: 100): Max requests per rate limit window.
 
 Configuration
 -------------

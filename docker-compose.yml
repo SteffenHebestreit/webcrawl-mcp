@@ -55,12 +55,18 @@ services:
       - "traefik.http.routers.mcp-server-sse.rule=Host(`mcp.localhost`) && PathPrefix(`/mcp/sse`)"
       - "traefik.http.routers.mcp-server-sse.entrypoints=web"
       # Health check configuration
-      - "traefik.http.services.mcp-server.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.mcp-server.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.mcp-server.loadbalancer.healthcheck.interval=10s"
     networks:
       - web
     volumes:
       - mcp_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:11235/api/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 5s
     # Add security options
     security_opt:
       - no-new-privileges:true

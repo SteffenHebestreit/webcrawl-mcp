@@ -79,6 +79,10 @@ export class Logger {
    */
   constructor(source?: string) {
     this.source = source;
+    this.debug = this.debug.bind(this);
+    this.info = this.info.bind(this);
+    this.warn = this.warn.bind(this);
+    this.error = this.error.bind(this);
   }
 
   /**

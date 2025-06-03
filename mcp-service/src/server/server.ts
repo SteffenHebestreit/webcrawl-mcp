@@ -12,6 +12,7 @@ import { setupMcpRoutes } from '../routes/mcpRoutes';
 import { setupMcpStreamableRoutes } from '../routes/mcpStreamableRoutes';
 import { setupApiRoutes } from '../routes/apiRoutes';
 import { createLogger } from '../utils/logger';
+import { requestLoggerMiddleware, errorLoggerMiddleware } from '../utils/requestLogger';
 
 /**
  * Unified Server - Configures and manages the Express application
@@ -49,6 +50,7 @@ export class Server {
    * Configure Express application middleware
    */
   private configureMiddleware(): void {
+    this.app.use(requestLoggerMiddleware);
     // Security headers
     this.app.use(helmet());
 
@@ -81,13 +83,16 @@ export class Server {
     this.app.use('/api', setupApiRoutes());
     
     // Mount MCP routes - both legacy SSE and modern Streamable HTTP
-    this.app.use('/mcp', setupMcpRoutes(this.mcpServer)); // Legacy SSE at /mcp/sse
-    this.app.use('/mcp/v2', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp/v2
+    this.app.use('/mcp/sse', setupMcpRoutes(this.mcpServer)); // Legacy SSE at /mcp/sse
+    this.app.use('/mcp/', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp/
     
     // Optional: Add a 404 handler for undefined routes
     this.app.use((req: Request, res: Response) => {
         res.status(404).json({ error: 'Not Found' });
     });
+
+    // Error logging middleware
+    this.app.use(errorLoggerMiddleware);
   }
 
   /**
