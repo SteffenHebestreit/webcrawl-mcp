@@ -35,11 +35,12 @@ export class Server {
     this.toolController = new ToolController(config, this.crawlExecutor);
 
     // Instantiate the MCP server
-    this.mcpServer = new SimpleMcpServer(config);
-
-    // Register tools with the MCP server instance
+    this.mcpServer = new SimpleMcpServer(config);    // Register tools with the MCP server instance
     this.mcpServer.tool(this.toolController.getCrawlToolConfig());
     this.mcpServer.tool(this.toolController.getMarkdownCrawlToolConfig());
+
+    // Register resources with the MCP server instance
+    this.mcpServer.resource(this.resourceController.getInfoResourceConfig());
 
     // Setup middleware and routes
     this.configureMiddleware();
@@ -85,6 +86,9 @@ export class Server {
     this.app.use('/mcp/sse', setupMcpRoutes(this.mcpServer)); // Legacy SSE at /mcp/sse
     this.app.use('/mcp', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp
     
+    // Mount tools routes under /mcp for better MCP integration
+    this.app.use('/mcp', setupApiRoutes()); // This adds /mcp/tools, /mcp/health, /mcp/version
+    
     // Optional: Add a 404 handler for undefined routes
     this.app.use((req: Request, res: Response) => {
         res.status(404).json({ error: 'Not Found' });
@@ -101,13 +105,20 @@ export class Server {
   public start(port?: number): void {
     const serverPort = port || config.get('port');    this.app.listen(serverPort, () => {
       this.logger.info(`${config.get('mcpName')} is running on port ${serverPort}`);
-      this.logger.info(`MCP SSE endpoint (deprecated): http://localhost:${serverPort}/mcp/sse`);
-      this.logger.info(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp`);
-      this.logger.info(`Health check endpoint: http://localhost:${serverPort}/api/health`);
-      this.logger.info(`Version info endpoint: http://localhost:${serverPort}/api/version`);
-      this.logger.info(`Tools listing endpoint: http://localhost:${serverPort}/api/tools`);
-      this.logger.info(`Direct crawl tool endpoint: http://localhost:${serverPort}/api/tools/crawl`);
-      this.logger.info(`Direct markdown crawl endpoint: http://localhost:${serverPort}/api/tools/crawlWithMarkdown`);
+      this.logger.info(`=== MCP ENDPOINTS ===`);
+      this.logger.info(`MCP SSE connection: GET http://localhost:${serverPort}/mcp/sse`);
+      this.logger.info(`MCP SSE messages: POST http://localhost:${serverPort}/mcp/messages`);
+      this.logger.info(`MCP Streamable HTTP (recommended): POST http://localhost:${serverPort}/mcp`);
+      this.logger.info(`=== API ENDPOINTS ===`);
+      this.logger.info(`Health check: GET http://localhost:${serverPort}/api/health`);
+      this.logger.info(`Version info: GET http://localhost:${serverPort}/api/version`);
+      this.logger.info(`Tools listing: GET http://localhost:${serverPort}/api/tools`);
+      this.logger.info(`Direct crawl tool: POST http://localhost:${serverPort}/api/tools/crawl`);
+      this.logger.info(`Direct markdown crawl: POST http://localhost:${serverPort}/api/tools/crawlWithMarkdown`);
+      this.logger.info(`=== MCP-INTEGRATED ENDPOINTS ===`);
+      this.logger.info(`MCP tools listing: GET http://localhost:${serverPort}/mcp/tools`);
+      this.logger.info(`MCP health check: GET http://localhost:${serverPort}/mcp/health`);
+      this.logger.info(`MCP version info: GET http://localhost:${serverPort}/mcp/version`);
     });
   }
 

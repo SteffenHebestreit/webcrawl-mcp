@@ -591,13 +591,11 @@ jobs:
         import { SimpleMcpServer } from '../mcp/SimpleMcpServer';
         import { createLogger } from '../utils/logger';
 
-        const logger = createLogger('McpStreamableRoutes');
-
-        export function createMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
+        const logger = createLogger('McpStreamableRoutes');        export function createMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
           const router = Router();
 
           // MCP Streamable HTTP endpoint (modern approach)
-          router.post('/v2', (req: Request, res: Response) => {
+          router.post('/', (req: Request, res: Response) => {
             logger.info('MCP Streamable HTTP endpoint called');
             
             // Set response headers
