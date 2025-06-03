@@ -99,26 +99,34 @@ export class CrawlExecutionService {
         if (!this.browser) {
             this.logger.info('Launching new browser instance');
             
-            const launchOptions = {
-                headless: true, // Use boolean instead of string
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--disable-gpu',
-                    '--window-size=1280,720',
-                ],
-                defaultViewport: { width: 1280, height: 720 },
-            };
-            
-            this.browser = await puppeteer.launch(launchOptions);
-            
-            // Handle unexpected browser closure
-            this.browser.on('disconnected', () => {
-                this.logger.info('Browser disconnected');
-                this.browser = null;
-            });
+            try {
+                const launchOptions = {
+                    headless: true, // Use boolean instead of string
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--disable-gpu',
+                        '--window-size=1280,720',
+                    ],
+                    defaultViewport: { width: 1280, height: 720 },
+                    // Try to make puppeteer find Chrome in standard installation paths
+                    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+                    ignoreDefaultArgs: ['--disable-extensions'],
+                };
+                
+                this.browser = await puppeteer.launch(launchOptions);
+                
+                // Handle unexpected browser closure
+                this.browser.on('disconnected', () => {
+                    this.logger.info('Browser disconnected');
+                    this.browser = null;
+                });
+            } catch (error: any) {
+                this.logger.error('Failed to launch browser:', error);
+                throw new Error(`Failed to launch browser: ${error.message}`);
+            }
         }
         
         return this.browser;
@@ -161,14 +169,12 @@ export class CrawlExecutionService {
      * Takes a screenshot of the current page
      */
     private async takeScreenshot(page: Page, url: string, index: number = 0): Promise<string> {
-        const screenshotPath = path.join(
-            this.tmpDir, 
-            `screenshot-${Date.now()}-${index}-${url.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)}.png`
-        );
+        const screenshotFilename = `screenshot-${Date.now()}-${index}-${url.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50)}.png`;
+        const screenshotPath = path.join(this.tmpDir, screenshotFilename);
         
         try {
             await page.screenshot({
-                path: screenshotPath,
+                path: screenshotPath as `${string}.png`,
                 fullPage: true,
             });
             this.logger.info(`Screenshot saved to ${screenshotPath}`);
