@@ -10,14 +10,50 @@ This document provides detailed specifications for the MCP server endpoints, JSO
 - **[CODE_STRUCTURE.md](CODE_STRUCTURE.md)**: Detailed explanation of each source file and its purpose.
 - **[OVERVIEW.md](OVERVIEW.md)**: High-level architecture and conceptual overview.
 
-## 1. SSE Endpoint: `/mcp/sse`
+## 1. Endpoints
+
+The MCP server provides two endpoint types:
+
+### 1.1 Streamable HTTP Endpoint: `/mcp/v2` (Recommended)
+
+- Method: `POST`
+- Description: Modern approach for JSON-RPC messaging with chunked transfer encoding.
+- Content-Type: `application/json`
+
+### 1.2 SSE Endpoint: `/mcp/sse` (Legacy)
 
 - Method: `POST`
 - Description: Establishes a Server-Sent Events (SSE) connection for bi-directional JSON-RPC messaging.
+- Content-Type: `application/json`
+- Accept: `text/event-stream`
 
-### 1.1 Connection Initialization
+## 2. Connection Initialization
 
-**Request** (empty body or initial handshake):
+### 2.1 Streamable HTTP Connection (`/mcp/v2`)
+
+**Request**:
+
+```http
+POST /mcp/v2 HTTP/1.1
+Host: <server>
+Content-Type: application/json
+
+{ }
+```
+
+**Response** (chunked):
+```
+{"jsonrpc":"2.0","result":{"mcp":{
+  "name":"<serverName>",
+  "version":"<version>",
+  "description":"<description>"
+}},"id":null}
+
+```
+
+### 2.2 SSE Connection (`/mcp/sse`)
+
+**Request**:
 
 ```http
 POST /mcp/sse HTTP/1.1
@@ -80,11 +116,11 @@ data: {"jsonrpc":"2.0","result":{"mcp":{
 
 ---
 
-## 2. JSON-RPC Methods
+## 3. JSON-RPC Methods
 
-All subsequent requests and responses use JSON-RPC 2.0 protocol over the SSE connection.  
+All subsequent requests and responses use JSON-RPC 2.0 protocol over either connection type.
 
-### 2.1 mcp.capabilities
+### 3.1 mcp.capabilities
 
 Retrieve lists of available tools and resources.
 
@@ -167,7 +203,7 @@ Schema:
 
 ---
 
-### 2.2 mcp.tool.use
+### 3.2 mcp.tool.use
 
 Invoke a registered tool by name.
 
@@ -257,7 +293,7 @@ Schema:
 
 ---
 
-### 2.3 mcp.resource.list
+### 3.3 mcp.resource.list
 
 List URIs available for a given resource.
 
@@ -314,7 +350,7 @@ Schema:
 
 ---
 
-### 2.4 mcp.resource.get
+### 3.4 mcp.resource.get
 
 Fetch content for a specific resource URI.
 
