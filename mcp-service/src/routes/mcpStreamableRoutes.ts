@@ -10,6 +10,34 @@ export function setupMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
   const router = Router();
   const logger = createLogger('MCP-Streamable');
 
+  // GET endpoint for MCP connection establishment/info
+  router.get('/', (req: Request, res: Response) => {
+    logger.info('Received MCP connection request (GET)');
+    
+    // Return MCP server information and connection details
+    res.json({
+      name: config.get('mcpName'),
+      version: config.get('mcpVersion'),
+      description: config.get('mcpDescription'),
+      protocol: 'mcp',
+      protocolVersion: '2024-11-05',
+      transport: 'streamable-http',
+      endpoints: {
+        streamable: {
+          method: 'POST',
+          url: '/mcp',
+          contentType: 'application/json'
+        }
+      },
+      capabilities: {
+        tools: {},
+        resources: {},
+        prompts: {},
+        logging: {}
+      }
+    });
+  });
+
   // Set up the primary MCP endpoint for JSON-RPC over Streamable HTTP
   router.post('/', async (req: Request, res: Response) => {
     logger.info('Received MCP Streamable HTTP request');
@@ -17,7 +45,6 @@ export function setupMcpStreamableRoutes(mcpServer: SimpleMcpServer): Router {
     // Set headers for Streamable HTTP
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Transfer-Encoding', 'chunked');
 
     try {
       // Pass request and response to the MCP server handler

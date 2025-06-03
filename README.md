@@ -25,7 +25,7 @@ This server achieves **100% compliance** with the official Model Context Protoco
 - **Standard Error Codes**: All JSON-RPC 2.0 error codes (-32700, -32600, -32601, -32602, -32603)
 
 ### 🚀 Transport Protocols
-- **Modern Streamable HTTP**: `/mcp` endpoint with chunked transfer encoding
+- **Modern Streamable HTTP**: `/mcp` endpoint with GET info endpoint and enhanced POST handling
 - **Official SSE Pattern**: Separate GET `/mcp/sse` (connection) + POST `/mcp/messages` (data)
 - **Legacy SSE Support**: Backward compatible POST `/mcp/sse` endpoint
 
@@ -33,6 +33,13 @@ This server achieves **100% compliance** with the official Model Context Protoco
 - **Modern Methods**: `tools/list`, `tools/call`, `resources/list`, `resources/read`
 - **Legacy Methods**: `mcp.capabilities`, `mcp.tool.use`, `mcp.resource.list`, `mcp.resource.get`
 - **Initialization**: `initialize`, `notifications/initialized`
+
+### 🎯 Enhanced Features (June 2025)
+- **JSON Schema Support**: Created `schemaConverter.ts` utility for converting Joi schemas to JSON Schema format
+- **Development-Friendly**: Relaxed rate limiting (1 min window, 1000 requests) for testing environment
+- **Enhanced Debugging**: Detailed request/response logging in Streamable HTTP handler
+- **HTTP Transport Improvements**: Proper JSON response termination and enhanced error handling
+- **Tool Definitions**: Dedicated schemas for `crawl` and `crawlWithMarkdown` tools with improved parameter validation
 
 ### 🧪 Testing
 Run MCP compliance tests: `npm run test:mcp-compliance`
@@ -84,13 +91,19 @@ Folder Structure
         │   ├── mcpRoutes.ts    # MCP-specific endpoints (SSE)
         │   └── mcpStreamableRoutes.ts # MCP endpoints with Streamable HTTP
         ├── server/             # Unified server implementation
-        │   └── server.ts       # Express and MCP server integration
-        ├── services/           # Business logic services
+        │   └── server.ts       # Express and MCP server integration        ├── services/           # Business logic services
         │   └── crawlExecutionService.ts  # Web crawling service
-        └── types/              # TypeScript type definitions
-            ├── mcp.ts          # MCP type definitions
-            ├── modelcontextprotocol.d.ts # MCP SDK type declarations
-            └── module.d.ts     # Module declarations for external libraries
+        ├── types/              # TypeScript type definitions
+        │   ├── mcp.ts          # MCP type definitions
+        │   ├── modelcontextprotocol.d.ts # MCP SDK type declarations
+        │   └── module.d.ts     # Module declarations for external libraries
+        ├── utils/              # Utility functions
+        │   ├── logger.ts       # Logging utilities
+        │   ├── requestLogger.ts # HTTP request logging middleware
+        │   └── schemaConverter.ts # Joi to JSON Schema conversion utilities
+        └── test/               # Test files
+            ├── mcp-compliance-test.ts # Comprehensive MCP compliance tests
+            └── mcp-compliance-test-simple.ts # Simple MCP tests
 ```
 
 Quick Start

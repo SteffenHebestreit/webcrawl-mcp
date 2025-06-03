@@ -13,6 +13,8 @@ This server is fully compliant with the official Model Context Protocol (MCP) sp
 - ✅ Official SSE pattern (GET for connection + POST for messages)
 - ✅ Both modern (`tools/list`, `tools/call`) and legacy (`mcp.tool.use`) method support
 - ✅ Transport callbacks (`onclose`, `onerror`, `onmessage`)
+- ✅ JSON Schema conversion for tools with standardized parameter schemas
+- ✅ Enhanced Streamable HTTP response handling with proper termination
 
 ---
 

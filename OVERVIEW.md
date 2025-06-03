@@ -56,6 +56,8 @@ MCP makes it easy to integrate external services (e.g., web crawlers) into LLM w
 - **Controllers**: Handle business logic for resources and tools with comprehensive error handling and validation
 - **MCP Protocol**: Implemented in the `SimpleMcpServer` class with support for both transport methods
 - **Advanced Web Crawler**: Puppeteer-based crawler with multiple strategies, content extraction, and screenshot capabilities
+- **Schema Conversion**: Automatic conversion from Joi schemas to JSON Schema format via `schemaConverter.ts`
+- **Enhanced Debugging**: Detailed request/response logging in Streamable HTTP handler with structured logging
 
 ## Key Concepts
 

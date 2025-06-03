@@ -106,6 +106,39 @@ This document provides an overview of the source code structure of the MCP-Serve
 ### Services (src/services/)
 
 - crawlExecutionService.ts
+  : Business logic for web crawling operations.
+
+### Types (src/types/)
+
+- mcp.ts
+  : MCP type definitions and interfaces.
+- modelcontextprotocol.d.ts
+  : MCP SDK type declarations.
+- module.d.ts
+  : Module declarations for external libraries.
+
+### Utilities (src/utils/)
+
+- logger.ts
+  : Logging utilities and configuration.
+- requestLogger.ts
+  : HTTP request logging middleware.
+- schemaConverter.ts
+  : Converts Joi validation schemas to JSON Schema format for MCP compliance.
+  : Provides dedicated schema generators for crawl and crawlWithMarkdown tools.
+  : Enhances MCP compatibility with standardized parameter schemas.
+  : Implements joiToJsonSchema utility and tool-specific schema generators.
+
+### Tests (src/test/)
+
+- mcp-compliance-test.ts
+  : Comprehensive MCP compliance testing suite.
+- mcp-compliance-test-simple.ts
+  : Simplified MCP compliance tests.
+
+### Services (src/services/)
+
+- crawlExecutionService.ts
   : Advanced web crawling service with Puppeteer integration. Features include:
     - **Browser Management**: Robust browser initialization with error handling and custom executable path support
     - **Content Extraction**: Text extraction, HTML-to-Markdown conversion, and table extraction

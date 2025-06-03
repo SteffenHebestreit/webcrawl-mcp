@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import config from '../config';
 import { ToolConfig, ResourceConfig } from '../types/mcp';
 import { createLogger } from '../utils/logger';
+import { joiToJsonSchema, getCrawlToolJsonSchema, getCrawlWithMarkdownToolJsonSchema } from '../utils/schemaConverter';
 import * as crypto from 'crypto';
 
 interface SessionData {
@@ -151,6 +152,8 @@ export class SimpleMcpServer {
   async handleStreamableHttpRequest(req: Request, res: Response): Promise<void> {
     try {
       this.logger.info('Handling MCP Streamable HTTP request');
+      this.logger.info('Request body:', JSON.stringify(req.body, null, 2));
+      this.logger.info('Request headers:', JSON.stringify(req.headers, null, 2));
 
       // Extract session ID from headers
       const sessionId = req.headers['mcp-session-id'] as string;
@@ -404,15 +407,24 @@ export class SimpleMcpServer {
       return;
     }
 
-    const tools = this.tools.map(t => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: {
-        type: 'object',
-        properties: t.parameters.describe?.() || {},
-        required: [] // Will be populated by parameter validation
+    const tools = this.tools.map(t => {
+      let inputSchema;
+      
+      // Use specific schemas for known tools, otherwise try to convert Joi schema
+      if (t.name === 'crawl') {
+        inputSchema = getCrawlToolJsonSchema();
+      } else if (t.name === 'crawlWithMarkdown') {
+        inputSchema = getCrawlWithMarkdownToolJsonSchema();
+      } else {
+        inputSchema = joiToJsonSchema(t.parameters);
       }
-    }));
+      
+      return {
+        name: t.name,
+        description: t.description,
+        inputSchema
+      };
+    });
     
     this.sendMessage(res, {
       jsonrpc: '2.0',
@@ -520,15 +532,24 @@ export class SimpleMcpServer {
       return;
     }
 
-    const tools = this.tools.map(t => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: {
-        type: 'object',
-        properties: t.parameters.describe?.() || {},
-        required: [] // Will be populated by parameter validation
+    const tools = this.tools.map(t => {
+      let inputSchema;
+      
+      // Use specific schemas for known tools, otherwise try to convert Joi schema
+      if (t.name === 'crawl') {
+        inputSchema = getCrawlToolJsonSchema();
+      } else if (t.name === 'crawlWithMarkdown') {
+        inputSchema = getCrawlWithMarkdownToolJsonSchema();
+      } else {
+        inputSchema = joiToJsonSchema(t.parameters);
       }
-    }));
+      
+      return {
+        name: t.name,
+        description: t.description,
+        inputSchema
+      };
+    });
 
     const capabilities = {
       tools,
@@ -730,14 +751,20 @@ export class SimpleMcpServer {
    */
   private sendStreamableHttpMessage(res: Response, message: any): void {
     try {
-      // Send JSON chunk with newline to make it easier to process client-side
-      res.write(JSON.stringify(message) + '\n');
-      // Flush to ensure the chunk is sent immediately
-      if (typeof (res as any).flush === 'function') {
-        (res as any).flush();
-      }
+      // For streamable HTTP, send the complete JSON response and end
+      res.json(message);
     } catch (error) {
       this.logger.error('Error sending Streamable HTTP message:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Internal server error'
+          },
+          id: null
+        });
+      }
     }
   }
 }
