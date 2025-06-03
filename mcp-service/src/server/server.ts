@@ -74,17 +74,16 @@ export class Server {
     });
     this.app.use(limiter);
   }
-
   /**
    * Set up all application routes
    */
-  private configureRoutes(): void {
+   private configureRoutes(): void {
     // Mount API routes
     this.app.use('/api', setupApiRoutes());
     
     // Mount MCP routes - both legacy SSE and modern Streamable HTTP
     this.app.use('/mcp/sse', setupMcpRoutes(this.mcpServer)); // Legacy SSE at /mcp/sse
-    this.app.use('/mcp/', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp/
+    this.app.use('/mcp', setupMcpStreamableRoutes(this.mcpServer)); // Modern Streamable HTTP at /mcp
     
     // Optional: Add a 404 handler for undefined routes
     this.app.use((req: Request, res: Response) => {
@@ -100,12 +99,10 @@ export class Server {
    * @param port The port to listen on (overrides config if provided)
    */
   public start(port?: number): void {
-    const serverPort = port || config.get('port');
-
-    this.app.listen(serverPort, () => {
+    const serverPort = port || config.get('port');    this.app.listen(serverPort, () => {
       this.logger.info(`${config.get('mcpName')} is running on port ${serverPort}`);
       this.logger.info(`MCP SSE endpoint (deprecated): http://localhost:${serverPort}/mcp/sse`);
-      this.logger.info(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp/v2`);
+      this.logger.info(`MCP Streamable HTTP endpoint (recommended): http://localhost:${serverPort}/mcp`);
       this.logger.info(`Health check endpoint: http://localhost:${serverPort}/api/health`);
       this.logger.info(`Version info endpoint: http://localhost:${serverPort}/api/version`);
     });

@@ -42,42 +42,58 @@ MCP makes it easy to integrate external services (e.g., web crawlers) into LLM w
    - **MCP Routes**: Implement MCP discovery (`/mcp/capabilities`) and invocation (`/mcp/sse`)
 
 3. **Crawl Execution**
-   - Fetches web pages, extracts text/Markdown, and returns structured data
+   - Advanced web crawling service with Puppeteer integration
+   - Multiple crawling strategies (BFS, DFS, Best-First)
+   - Intelligent content extraction (text, markdown, tables)
+   - Screenshot capture and network traffic monitoring capabilities
+   - Error resilience with timeout management and connection recovery
 
 ## Key Components
 
-- **Centralized Configuration**: All configuration is logically organized in the `config` directory
-- **Unified Server**: Combines Express and MCP functionality in a single server class
-- **Modular Routes**: Route definitions are separated by domain (API, MCP)
-- **Controllers**: Handle business logic for resources and tools
-- **MCP Protocol**: Implemented in the `SimpleMcpServer` class
+- **Centralized Configuration**: All configuration is logically organized in the `config` directory with separate modules for app, MCP, security, and crawling settings
+- **Unified Server**: Combines Express and MCP functionality in a single server class with integrated routing
+- **Modular Routes**: Route definitions are separated by domain (API, MCP) with support for both modern Streamable HTTP and legacy SSE endpoints
+- **Controllers**: Handle business logic for resources and tools with comprehensive error handling and validation
+- **MCP Protocol**: Implemented in the `SimpleMcpServer` class with support for both transport methods
+- **Advanced Web Crawler**: Puppeteer-based crawler with multiple strategies, content extraction, and screenshot capabilities
 
 ## Key Concepts
 
 - **Resource**: An addressable endpoint (`info://`, `crawl://`, etc.) that groups related tools or data.
-- **Tool**: A callable function (e.g., `crawl`, `crawlWithMarkdown`) that performs a specific task.
-- **SSE Endpoint**: `/mcp/sse` streams JSON‑encoded messages as events.
+- **Tool**: A callable function that performs a specific task:
+  - `crawl`: Basic web crawling with text extraction and table parsing
+  - `crawlWithMarkdown`: Advanced crawling with HTML-to-Markdown conversion and query support
+- **SSE Endpoint**: `/mcp/sse` streams JSON‑encoded messages as events (legacy)
+- **Streamable HTTP**: `/mcp` modern JSON-RPC over HTTP with chunked transfer encoding (recommended)
+- **Crawling Strategies**: Different approaches to multi-page crawling (BFS, DFS, Best-First)
+- **Content Extraction**: Intelligent extraction of visible text, tables, and optional screenshots
 
 ## Usage Flow
 
 1. **Discover tools**: Query `/mcp/capabilities` to list resources and tools.
-2. **Invoke a tool**: Send a POST to `/mcp/sse` with a JSON payload:
+2. **Invoke a tool**: Send a POST to `/mcp` (recommended) or `/mcp/sse` (legacy) with a JSON payload:
    ```json
    {
      "jsonrpc": "2.0",
      "method": "mcp.tool.use",
      "params": {
        "name": "crawl",
-       "parameters": { "url": "https://example.com" }
+       "parameters": { 
+         "url": "https://example.com",
+         "maxPages": 3,
+         "depth": 1,
+         "strategy": "bfs",
+         "captureScreenshots": true
+       }
      },
      "id": 1
    }
    ```
-3. **Process results**: Consume SSE events with partial or final outputs.
+3. **Process results**: Consume response with structured data including text, markdown, tables, or error information.
 
 ## API Endpoints
 
-- **`/mcp/v2`**: Modern MCP endpoint using Streamable HTTP (recommended)
+- **`/mcp`**: Modern MCP endpoint using Streamable HTTP (recommended)
 - **`/mcp/sse`**: Legacy MCP endpoint for Server-Sent Events communication
 - **`/api/health`**: Health check endpoint
 - **`/api/version`**: Version information endpoint

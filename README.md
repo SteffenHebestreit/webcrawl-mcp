@@ -73,18 +73,26 @@ docker-compose up --build
    ```bash
    npm install
    ```
-2. Define environment variables (see **Configuration**).
-3. Start the server:
+2. Navigate to the mcp-service directory:
+   ```bash
+   cd mcp-service
+   npm install
+   ```
+3. Define environment variables (see **Configuration**).
+4. Build and start the server:
    ```bash
    npm run build
    npm start
+   
+   # Or for development with auto-reload:
+   npm run dev
    ```
 
 # API Endpoints
 
 The server provides multiple endpoints:
 
-- **MCP Streamable HTTP** (Recommended): `/mcp/v2` - Modern JSON-RPC over HTTP with streaming support
+- **MCP Streamable HTTP** (Recommended): `/mcp` - Modern JSON-RPC over HTTP with streaming support
 - **MCP SSE** (Deprecated): `/mcp/sse` - Legacy Server-Sent Events endpoint
 - **API Endpoints**: `/api/health`, `/api/version` - General server information
 
@@ -98,7 +106,7 @@ The modern approach recommended by the MCP specification.
 
 ### Capabilities Request
 ```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
+curl -X POST http://localhost:${PORT:-3000}/mcp \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
@@ -110,14 +118,22 @@ curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
 
 ### Use Tool (crawl)
 ```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
+curl -X POST http://localhost:${PORT:-3000}/mcp \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
       "method": "mcp.tool.use",
       "params": {
         "name": "crawl",
-        "parameters": { "url": "https://example.com", "maxPages": 1 }
+        "parameters": { 
+          "url": "https://example.com", 
+          "maxPages": 3,
+          "depth": 1,
+          "strategy": "bfs",
+          "captureScreenshots": true,
+          "captureNetworkTraffic": false,
+          "waitTime": 2000
+        }
       },
       "id": 2
     }'
@@ -125,14 +141,20 @@ curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
 
 ### Use Tool (crawlWithMarkdown)
 ```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp/v2 \
+curl -X POST http://localhost:${PORT:-3000}/mcp \
   -H "Content-Type: application/json" \
   -d '{
       "jsonrpc": "2.0",
       "method": "mcp.tool.use",
       "params": {
         "name": "crawlWithMarkdown",
-        "parameters": { "url": "https://example.com", "query": "What is this site about?" }
+        "parameters": { 
+          "url": "https://example.com", 
+          "query": "What is this site about?",
+          "maxPages": 2,
+          "depth": 1,
+          "waitTime": 1500
+        }
       },
       "id": 3
     }'
@@ -206,6 +228,8 @@ Environment Variables
 - `CORS_ORIGINS` (default: *): Allowed origins for CORS.
 - `RATE_LIMIT_WINDOW` (default: 900000): Rate limit window in milliseconds (15 minutes).
 - `RATE_LIMIT_MAX_REQUESTS` (default: 100): Max requests per rate limit window.
+- `PUPPETEER_EXECUTABLE_PATH` (optional): Custom path to Chrome/Chromium executable for Puppeteer.
+- `PUPPETEER_SKIP_DOWNLOAD` (default: false): Skip automatic Chromium download during installation.
 
 Configuration
 -------------
@@ -223,6 +247,39 @@ Key Components
 - **Controllers**: `toolController` and `resourceController` for handling business logic.
 - **Configuration**: Centralized configuration system with module-specific settings.
 - **MCP Transport**: Supports both modern Streamable HTTP and legacy SSE transport methods.
+- **Web Crawling**: Advanced Puppeteer-based crawler with error handling, multiple strategies, and content extraction capabilities.
+
+## Web Crawling Features
+
+The MCP server includes a comprehensive web crawling service with the following features:
+
+### Browser Management
+- **Robust Error Handling**: Improved browser initialization with proper error handling and fallback mechanisms
+- **Custom Chrome Path**: Support for custom Chrome/Chromium executable paths via `PUPPETEER_EXECUTABLE_PATH`
+- **Resource Management**: Automatic browser cleanup and connection management
+
+### Content Extraction
+- **Text Extraction**: Intelligent visible text extraction that skips hidden elements and scripts
+- **Markdown Conversion**: HTML to Markdown conversion with custom rules for tables and code blocks
+- **Table Extraction**: Structured extraction of HTML tables with caption support
+- **Screenshot Capture**: Optional full-page screenshot functionality
+
+### Crawling Strategies
+- **Breadth-First Search (BFS)**: Default strategy for systematic exploration
+- **Depth-First Search (DFS)**: Prioritizes deeper paths in the site structure
+- **Best-First Search**: Simple heuristic-based crawling (shorter paths first)
+
+### Advanced Options
+- **Network Traffic Monitoring**: Optional tracking of HTTP requests during crawling
+- **Multi-page Crawling**: Support for crawling multiple pages with depth control
+- **Wait Time Configuration**: Configurable delays between page loads
+- **Screenshot Capture**: Optional full-page screenshots saved to temporary directory
+
+### Error Resilience
+- **Browser Launch Fallbacks**: Multiple strategies for browser initialization
+- **Connection Recovery**: Automatic reconnection handling for disconnected browsers
+- **URL Validation**: Robust URL parsing and validation with error handling
+- **Timeout Management**: Configurable timeouts to prevent hanging on slow pages
 
 Customization
 -------------

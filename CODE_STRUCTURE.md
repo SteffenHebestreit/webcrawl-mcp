@@ -106,7 +106,12 @@ This document provides an overview of the source code structure of the MCP-Serve
 ### Services (src/services/)
 
 - crawlExecutionService.ts
-  : Business logic for crawling and parsing web content.
+  : Advanced web crawling service with Puppeteer integration. Features include:
+    - **Browser Management**: Robust browser initialization with error handling and custom executable path support
+    - **Content Extraction**: Text extraction, HTML-to-Markdown conversion, and table extraction
+    - **Multiple Crawling Strategies**: BFS, DFS, and best-first search algorithms
+    - **Advanced Features**: Screenshot capture, network traffic monitoring, and multi-page crawling
+    - **Error Resilience**: Comprehensive error handling, timeout management, and connection recovery
 
 ### Types (src/types/)
 
