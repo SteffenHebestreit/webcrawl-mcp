@@ -32,6 +32,24 @@
 - **Enhanced**: Session management and protocol negotiation
 - **Preserved**: Backward compatibility with legacy methods
 
+### ✅ Advanced Content Extraction
+- **NEW**: Specialized detection and handling for lottery and jackpot content
+- **Improved**: SmartCrawlTool with adaptive relevance thresholds for different content types
+- **Enhanced**: Better fallback content extraction when no strong matches are found
+- **Added**: Pattern-based detection for lottery-related queries
+
+### ✅ Markdown Formatting Improvements
+- **Redesigned**: CrawlWithMarkdown implementation with better clean text extraction
+- **Added**: Intelligent section and heading detection
+- **Enhanced**: Proper markdown formatting with headings and structure
+- **Included**: Word count and estimated reading time calculations
+
+### ✅ Testing & Validation
+- **Added**: Comprehensive test suite for content extraction and relevance scoring
+- **Created**: Specialized tests for problematic sites like eurojackpot.de
+- **Implemented**: Comparison tests between different crawler implementations
+- **Validated**: Content extraction from structurally complex websites
+
 ## Technical Impact
 
 ### Schema Conversion System

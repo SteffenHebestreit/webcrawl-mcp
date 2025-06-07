@@ -247,12 +247,17 @@ Retrieve lists of available tools and resources.
         "description": "Crawl a website and extract text content and tables.",
         "parameterDescription": "URL to crawl along with optional crawling parameters like maxPages, depth, strategy, captureScreenshots, captureNetworkTraffic, and waitTime.",
         "returnDescription": "Object containing success status, original URL, extracted text content, optional tables, and optional error message."
-      },
-      { 
+      },      { 
         "name": "crawlWithMarkdown", 
         "description": "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
         "parameterDescription": "URL to crawl, optional crawling parameters, and an optional query.",
         "returnDescription": "Object containing success status, original URL, markdown content, and optional error message."
+      },
+      { 
+        "name": "generateSitemap", 
+        "description": "Generate a comprehensive sitemap by crawling a website to a specified depth, extracting page titles, descriptions, and creating a hierarchical structure of all discoverable pages.",
+        "parameterDescription": "URL to start crawling (required), depth for crawling levels (default: 2), maxPages limit (default: 50), and optional parameters for filtering, metadata extraction, and robots.txt compliance.",
+        "returnDescription": "Comprehensive sitemap object containing hierarchical page structure, metadata, headings, statistics, and parent-child relationships for site navigation and analysis."
       }
     ],
     "resources": [
@@ -415,7 +420,7 @@ Basic web crawling tool that extracts text content and tables.
 
 #### 3.2.2 crawlWithMarkdown Tool
 
-Advanced crawling tool that converts HTML content to Markdown format, optionally answering specific queries.
+Advanced crawling tool that converts HTML content to Markdown format, optionally answering specific queries. The tool has been optimized for clean text extraction and proper markdown formatting, with special handling for structured content like lottery results.
 
 **Request**:
 ```json
@@ -464,12 +469,15 @@ Advanced crawling tool that converts HTML content to Markdown format, optionally
 
 **Response**:
 ```json
-{
-  "jsonrpc": "2.0",
+{  "jsonrpc": "2.0",
   "result": {
     "success": true,
     "url": "https://example.com",
+    "query": "What is this site about?",
     "markdown": "# Page Title\n\nContent converted to markdown...",
+    "contentSummary": "Markdown content extracted for query: \"What is this site about?\"",
+    "wordCount": 256,
+    "estimatedReadingTime": 2,
     "error": null
   },
   "id": 3
@@ -484,16 +492,290 @@ Advanced crawling tool that converts HTML content to Markdown format, optionally
   "properties": {
     "success": { "type": "boolean" },
     "url": { "type": "string", "format": "uri" },
+    "query": { "type": "string" },
     "markdown": { "type": "string" },
+    "contentSummary": { "type": "string" },
+    "wordCount": { "type": "integer" },
+    "estimatedReadingTime": { "type": "integer" },
     "error": { "type": ["string", "null"] }
   },
   "required": ["success", "url", "markdown"]
 }
 ```
 
+#### Implementation Details
+
+The CrawlWithMarkdown tool includes several optimizations:
+1. **Clean Text Extraction**: First extracts raw content using ContentCrawler
+2. **Markdown Conversion**: Converts the content to proper markdown with headings and formatting
+3. **Section Detection**: Identifies potential headings based on text patterns
+4. **Word Count & Reading Time**: Provides estimated reading time based on a 200 words-per-minute rate
+
+#### 3.2.3 smartCrawl Tool
+
+Advanced intelligent crawling tool that extracts content with relevance scoring and summarization. Optimized for various content types, including lottery and jackpot information.
+
+**Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "mcp.tool.use",
+  "params": {
+    "name": "smartCrawl",
+    "parameters": {
+      "url": "https://example.com",
+      "query": "What is the current jackpot amount?",
+      "maxPages": 3,
+      "depth": 1,
+      "relevanceThreshold": 1.5
+    }
+  },
+  "id": 4
+}
+```
+
+**Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "url": "https://example.com",
+    "query": "What is the current jackpot amount?",
+    "relevantPages": [
+      {
+        "url": "https://example.com",
+        "title": "Main Page",
+        "summary": "The current jackpot amount is €120 million. The next draw will be on Friday.",
+        "relevanceScore": 3.0,
+        "keyFindings": [
+          "Current jackpot: €120 million",
+          "Next draw: Friday, June 10",
+          "Last week's winning numbers: 3, 12, 24, 35, 49 + 5, 10"
+        ]
+      }
+    ],
+    "overallSummary": "Found 5 relevant matches for \"What is the current jackpot amount?\". The current jackpot is €120 million.",
+    "error": null
+  },
+  "id": 4
+}
+```
+
+#### Result Schema for smartCrawl
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": { "type": "boolean" },
+    "url": { "type": "string", "format": "uri" },
+    "query": { "type": "string" },
+    "relevantPages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "relevanceScore": { "type": "number" },
+          "keyFindings": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "overallSummary": { "type": "string" },
+    "error": { "type": ["string", "null"] }
+  },
+  "required": ["success", "url", "query", "relevantPages", "overallSummary"]
+}
+```
+
+#### Special Content Type Handling
+
+The smartCrawl tool includes specialized handling for certain content types:
+
+1. **Lottery and Jackpot Content**: When a query contains lottery-related terms (e.g., "lottery", "jackpot", "eurojackpot", "winning numbers"), the tool:
+   - Applies a lower relevance threshold (0.5 vs standard 2.0)
+   - Ensures content is included regardless of calculated relevance score
+   - Assigns a higher base relevance score (3.0) to lottery content
+   - Uses fallback content extraction when no strong matches are found
+
+This ensures reliable extraction of content from lottery and jackpot websites, which often have unique content structures.
+
+#### 3.2.4 generateSitemap Tool
+
+Advanced sitemap generation tool that crawls a website systematically to create a hierarchical map of all discoverable pages with metadata extraction.
+
+**Request**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "mcp.tool.use",
+  "params": {
+    "name": "generateSitemap",
+    "parameters": {
+      "url": "https://example.com",
+      "depth": 3,
+      "maxPages": 100,
+      "includeMetadata": true,
+      "excludePatterns": ["*/admin/*", "*/private/*"],
+      "respectRobotsTxt": true,
+      "includeExternalLinks": false
+    }
+  },
+  "id": 4
+}
+```
+
+#### Params Schema for generateSitemap
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": { "const": "generateSitemap" },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "depth": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "maxPages": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "includeMetadata": { "type": "boolean" },
+        "excludePatterns": { 
+          "type": "array", 
+          "items": { "type": "string" } 
+        },
+        "respectRobotsTxt": { "type": "boolean" },
+        "includeExternalLinks": { "type": "boolean" },
+        "waitTime": { "type": "integer", "minimum": 100 }
+      },
+      "required": ["url"]
+    }
+  },
+  "required": ["name", "parameters"],
+  "additionalProperties": false
+}
+```
+
+**Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "baseUrl": "https://example.com",
+    "totalPages": 47,
+    "depth": 3,
+    "pages": [
+      {
+        "url": "https://example.com/",
+        "title": "Example Domain",
+        "description": "This domain is for use in illustrative examples in documents...",
+        "headings": ["h1: Example Domain", "h2: More information..."],
+        "wordCount": 123,
+        "lastModified": "2024-01-15T10:30:00Z",
+        "level": 0,
+        "parent": null,
+        "children": ["https://example.com/about", "https://example.com/contact"],
+        "status": 200,
+        "contentType": "text/html",
+        "isExternal": false
+      },
+      {
+        "url": "https://example.com/about",
+        "title": "About Us - Example Domain",
+        "description": "Learn more about our example domain and its purpose...",
+        "headings": ["h1: About Us", "h2: Our Mission", "h2: Contact Information"],
+        "wordCount": 267,
+        "lastModified": "2024-01-10T14:22:00Z",
+        "level": 1,
+        "parent": "https://example.com/",
+        "children": [],
+        "status": 200,
+        "contentType": "text/html",
+        "isExternal": false
+      }
+    ],
+    "statistics": {
+      "totalPages": 47,
+      "successfulPages": 45,
+      "failedPages": 2,
+      "externalLinks": 12,
+      "averageWordsPerPage": 347,
+      "processingTimeMs": 15234
+    },
+    "hierarchy": {
+      "https://example.com/": {
+        "level": 0,
+        "children": ["https://example.com/about", "https://example.com/contact"]
+      },
+      "https://example.com/about": {
+        "level": 1,
+        "children": []
+      }
+    },
+    "error": null
+  },
+  "id": 4
+}
+```
+
+#### Result Schema for generateSitemap
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": { "type": "boolean" },
+    "baseUrl": { "type": "string", "format": "uri" },
+    "totalPages": { "type": "integer" },
+    "depth": { "type": "integer" },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "title": { "type": ["string", "null"] },
+          "description": { "type": ["string", "null"] },
+          "headings": { "type": "array", "items": { "type": "string" } },
+          "wordCount": { "type": "integer" },
+          "lastModified": { "type": ["string", "null"] },
+          "level": { "type": "integer" },
+          "parent": { "type": ["string", "null"] },
+          "children": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "integer" },
+          "contentType": { "type": "string" },
+          "isExternal": { "type": "boolean" }
+        },
+        "required": ["url", "level", "isExternal"]
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "totalPages": { "type": "integer" },
+        "successfulPages": { "type": "integer" },
+        "failedPages": { "type": "integer" },
+        "externalLinks": { "type": "integer" },
+        "averageWordsPerPage": { "type": "number" },
+        "processingTimeMs": { "type": "integer" }
+      }
+    },
+    "hierarchy": { "type": "object" },
+    "error": { "type": ["string", "null"] }
+  },
+  "required": ["success", "baseUrl", "pages", "statistics"]
+}
+```
+
 #### Tool Parameters Reference
 
-Both crawling tools support the following parameters:
+All crawling tools support the following basic parameters:
 
 - **url** (required): The URL to crawl
 - **maxPages** (optional): Maximum number of pages to crawl (default: 1-10 depending on configuration)
@@ -508,6 +790,14 @@ Additional parameters for the `crawl` tool only:
 Additional parameters for the `crawlWithMarkdown` tool only:
 - **query** (optional): A specific question or query to focus the crawling on
 
+Additional parameters for the `generateSitemap` tool only:
+- **depth** (optional): Depth of crawling for sitemap generation (default: 2, max: 5)
+- **maxPages** (optional): Maximum number of pages to include in the sitemap (default: 50, max: 1000)
+- **includeMetadata** (optional): Whether to include metadata extraction (default: true)
+- **excludePatterns** (optional): URL patterns to exclude from crawling (default: none)
+- **respectRobotsTxt** (optional): Whether to respect robots.txt rules (default: true)
+- **includeExternalLinks** (optional): Whether to include external links in the sitemap (default: false)
+
 #### Error Response
 
 ```json
@@ -519,8 +809,8 @@ Additional parameters for the `crawlWithMarkdown` tool only:
 ```
 
 Schema:
-- `params`: `{ name: "crawl" | "crawlWithMarkdown"; parameters: CrawlParams | CrawlWithMarkdownParams }`  
-- `result`: `CrawlResponse | CrawlWithMarkdownResponse`
+- `params`: `{ name: "crawl" | "crawlWithMarkdown" | "generateSitemap"; parameters: CrawlParams | CrawlWithMarkdownParams | SitemapGeneratorParams }`  
+- `result`: `CrawlResponse | CrawlWithMarkdownResponse | SitemapGeneratorResponse`
 
 ---
 
@@ -788,6 +1078,143 @@ curl -X POST http://localhost:3000/mcp \
     },
     "id": 3
   }'
+```
+
+### 6.4 Smart Crawl Example
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "mcp.tool.use",
+    "params": {
+      "name": "smartCrawl",
+      "parameters": {
+        "url": "https://example.com",
+        "query": "What is the current jackpot amount?",
+        "maxPages": 3,
+        "depth": 1,
+        "relevanceThreshold": 1.5
+      }
+    },
+    "id": 4
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "url": "https://example.com",
+    "query": "What is the current jackpot amount?",
+    "relevantPages": [
+      {
+        "url": "https://example.com",
+        "title": "Main Page",
+        "summary": "The current jackpot amount is €120 million. The next draw will be on Friday.",
+        "relevanceScore": 3.0,
+        "keyFindings": [
+          "Current jackpot: €120 million",
+          "Next draw: Friday, June 10",
+          "Last week's winning numbers: 3, 12, 24, 35, 49 + 5, 10"
+        ]
+      }
+    ],
+    "overallSummary": "Found 5 relevant matches for \"What is the current jackpot amount?\". The current jackpot is €120 million.",
+    "error": null
+  },
+  "id": 4
+}
+```
+
+### 6.5 Sitemap Generation Example
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "mcp.tool.use",
+    "params": {
+      "name": "generateSitemap",
+      "parameters": {
+        "url": "https://example.com",
+        "depth": 3,
+        "maxPages": 100,
+        "includeMetadata": true,
+        "excludePatterns": ["*/admin/*", "*/private/*"],
+        "respectRobotsTxt": true,
+        "includeExternalLinks": false
+      }
+    },
+    "id": 4
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "success": true,
+    "baseUrl": "https://example.com",
+    "totalPages": 47,
+    "depth": 3,
+    "pages": [
+      {
+        "url": "https://example.com/",
+        "title": "Example Domain",
+        "description": "This domain is for use in illustrative examples in documents...",
+        "headings": ["h1: Example Domain", "h2: More information..."],
+        "wordCount": 123,
+        "lastModified": "2024-01-15T10:30:00Z",
+        "level": 0,
+        "parent": null,
+        "children": ["https://example.com/about", "https://example.com/contact"],
+        "status": 200,
+        "contentType": "text/html",
+        "isExternal": false
+      },
+      {
+        "url": "https://example.com/about",
+        "title": "About Us - Example Domain",
+        "description": "Learn more about our example domain and its purpose...",
+        "headings": ["h1: About Us", "h2: Our Mission", "h2: Contact Information"],
+        "wordCount": 267,
+        "lastModified": "2024-01-10T14:22:00Z",
+        "level": 1,
+        "parent": "https://example.com/",
+        "children": [],
+        "status": 200,
+        "contentType": "text/html",
+        "isExternal": false
+      }
+    ],
+    "statistics": {
+      "totalPages": 47,
+      "successfulPages": 45,
+      "failedPages": 2,
+      "externalLinks": 12,
+      "averageWordsPerPage": 347,
+      "processingTimeMs": 15234
+    },
+    "hierarchy": {
+      "https://example.com/": {
+        "level": 0,
+        "children": ["https://example.com/about", "https://example.com/contact"]
+      },
+      "https://example.com/about": {
+        "level": 1,
+        "children": []
+      }
+    },
+    "error": null
+  },
+  "id": 4
+}
 ```
 
 *End of MCP API Reference*

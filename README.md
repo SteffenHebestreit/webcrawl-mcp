@@ -35,6 +35,9 @@ This server achieves **100% compliance** with the official Model Context Protoco
 - **Initialization**: `initialize`, `notifications/initialized`
 
 ### 🎯 Enhanced Features (June 2025)
+- **Content Extraction**: Improved crawling of lottery and jackpot sites with specialized detection
+- **Smart Relevance Scoring**: Adaptive thresholds for different content types
+- **Markdown Generation**: Better formatting with proper headings and section detection
 - **JSON Schema Support**: Created `schemaConverter.ts` utility for converting Joi schemas to JSON Schema format
 - **Development-Friendly**: Relaxed rate limiting (1 min window, 1000 requests) for testing environment
 - **Enhanced Debugging**: Detailed request/response logging in Streamable HTTP handler

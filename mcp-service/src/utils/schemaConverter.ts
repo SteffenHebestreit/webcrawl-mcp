@@ -196,3 +196,57 @@ export function getCrawlWithMarkdownToolJsonSchema() {
     additionalProperties: false
   };
 }
+
+/**
+ * Get JSON Schema for the webSearch tool parameters
+ */
+export function getWebSearchToolJsonSchema() {
+  return {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string'
+      },
+      engine: {
+        type: 'string',
+        enum: ['google', 'duckduckgo', 'searxng']
+      },
+      numResults: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 30
+      },
+      safeSearch: {
+        type: 'boolean'
+      },
+      timeRange: {
+        type: 'string',
+        enum: ['day', 'week', 'month', 'year']
+      }
+    },
+    required: ['query'],
+    additionalProperties: false
+  };
+}
+
+/**
+ * Get JSON Schema for the dateTime tool parameters
+ */
+export function getDateTimeToolJsonSchema() {
+  return {
+    type: 'object',
+    properties: {
+      city: {
+        type: 'string'
+      },
+      format: {
+        type: 'string',
+        enum: ['iso', 'human', 'both']
+      },
+      includeTimezone: {
+        type: 'boolean'
+      }
+    },
+    additionalProperties: false
+  };
+}

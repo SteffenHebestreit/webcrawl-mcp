@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import { Server as HttpServer } from 'http';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -20,6 +21,7 @@ import { requestLoggerMiddleware, errorLoggerMiddleware } from '../utils/request
  */
 export class Server {
   private app: Express;
+  private httpServer?: HttpServer;
   private mcpServer: SimpleMcpServer;
   private resourceController: ResourceController;
   private toolController: ToolController;
@@ -35,9 +37,13 @@ export class Server {
     this.toolController = new ToolController(config, this.crawlExecutor);
 
     // Instantiate the MCP server
-    this.mcpServer = new SimpleMcpServer(config);    // Register tools with the MCP server instance
-    this.mcpServer.tool(this.toolController.getCrawlToolConfig());
+    this.mcpServer = new SimpleMcpServer(config);    // Register tools with the MCP server instance    this.mcpServer.tool(this.toolController.getCrawlToolConfig());
     this.mcpServer.tool(this.toolController.getMarkdownCrawlToolConfig());
+    this.mcpServer.tool(this.toolController.getSearchInPageToolConfig());    this.mcpServer.tool(this.toolController.getSmartCrawlToolConfig());
+    this.mcpServer.tool(this.toolController.getExtractLinksToolConfig());
+    this.mcpServer.tool(this.toolController.getSitemapGeneratorToolConfig());
+    this.mcpServer.tool(this.toolController.getWebSearchToolConfig());
+    this.mcpServer.tool(this.toolController.getDateTimeToolConfig());
 
     // Register resources with the MCP server instance
     this.mcpServer.resource(this.resourceController.getInfoResourceConfig());
@@ -46,12 +52,31 @@ export class Server {
     this.configureMiddleware();
     this.configureRoutes();
   }
-
   /**
    * Configure Express application middleware
    */
   private configureMiddleware(): void {
     this.app.use(requestLoggerMiddleware);
+    
+    // Request timeout middleware for long-running operations
+    this.app.use((req: Request, res: Response, next) => {
+      const requestTimeout = config.get('requestTimeout');
+      req.setTimeout(requestTimeout, () => {
+        this.logger.warn(`Request timeout after ${requestTimeout}ms for ${req.method} ${req.url}`);
+        if (!res.headersSent) {
+          res.status(408).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: 'Request timeout - operation took too long to complete',
+            },
+            id: null
+          });
+        }
+      });
+      next();
+    });
+    
     // Security headers
     this.app.use(helmet());
 
@@ -97,13 +122,15 @@ export class Server {
     // Error logging middleware
     this.app.use(errorLoggerMiddleware);
   }
-
   /**
    * Start the server
    * @param port The port to listen on (overrides config if provided)
    */
   public start(port?: number): void {
-    const serverPort = port || config.get('port');    this.app.listen(serverPort, () => {
+    const serverPort = port || config.get('port');
+    
+    // Create HTTP server instance
+    this.httpServer = this.app.listen(serverPort, () => {
       this.logger.info(`${config.get('mcpName')} is running on port ${serverPort}`);
       this.logger.info(`=== MCP ENDPOINTS ===`);
       this.logger.info(`MCP SSE connection: GET http://localhost:${serverPort}/mcp/sse`);
@@ -120,12 +147,53 @@ export class Server {
       this.logger.info(`MCP health check: GET http://localhost:${serverPort}/mcp/health`);
       this.logger.info(`MCP version info: GET http://localhost:${serverPort}/mcp/version`);
     });
-  }
 
+    // Configure HTTP server timeouts for long-running operations
+    if (this.httpServer) {
+      const serverTimeout = config.get('serverTimeout');
+      const keepAliveTimeout = config.get('keepAliveTimeout'); 
+      const headersTimeout = config.get('headersTimeout');
+      
+      this.httpServer.timeout = serverTimeout; // Overall request timeout
+      this.httpServer.keepAliveTimeout = keepAliveTimeout; // Keep-alive timeout
+      this.httpServer.headersTimeout = headersTimeout; // Headers timeout
+      
+      this.logger.info(`HTTP server timeouts configured:`);
+      this.logger.info(`  - Server timeout: ${serverTimeout}ms (${serverTimeout/1000}s)`);
+      this.logger.info(`  - Keep-alive timeout: ${keepAliveTimeout}ms (${keepAliveTimeout/1000}s)`);
+      this.logger.info(`  - Headers timeout: ${headersTimeout}ms (${headersTimeout/1000}s)`);
+    }
+  }
   /**
    * Get the Express app instance
    */
   public getApp(): express.Application {
     return this.app;
+  }
+
+  /**
+   * Get the HTTP server instance
+   */
+  public getHttpServer(): HttpServer | undefined {
+    return this.httpServer;
+  }
+
+  /**
+   * Gracefully shutdown the server
+   */
+  public async shutdown(): Promise<void> {
+    if (this.httpServer) {
+      return new Promise((resolve, reject) => {
+        this.httpServer!.close((err) => {
+          if (err) {
+            this.logger.error('Error closing HTTP server:', err);
+            reject(err);
+          } else {
+            this.logger.info('HTTP server closed gracefully');
+            resolve();
+          }
+        });
+      });
+    }
   }
 }
