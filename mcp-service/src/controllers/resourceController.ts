@@ -45,12 +45,15 @@ export class ResourceController {
       contents: [
         {
           uri: "info://about",
-          text: `# ${serverName} v${version}\n\n` +
-                `${description}\n\n` +
+          text: `# ${serverName} v${version}\n\n` +                `${description}\n\n` +
                 "This MCP server provides web crawling capabilities for AI agents. " +
-                "You can use the following tools:\n\n" +
-                "- `crawl`: Crawl a website and get structured data back\n" +
-                "- `crawlWithMarkdown`: Crawl a website and get markdown-formatted content\n\n" +
+                "You can use the following tools:\n\n" +                "- `crawl`: Extract web content based on a query (requires URL and query)\n" +
+                "- `crawlWithMarkdown`: Convert web content to markdown (requires URL, query is optional)\n" +
+                "- `smartCrawl`: Find content relevant to a query with scoring (requires URL and query)\n" +                "- `searchInPage`: Search for specific content within a page (requires URL and query)\n" +
+                "- `extractLinks`: Extract all internal links from a webpage (requires URL)\n" +
+                "- `generateSitemap`: Generate a comprehensive sitemap (requires URL)\n" +
+                "- `webSearch`: Search the web using various search engines (requires query only)\n" +
+                "- `dateTime`: Get current date and time for a specific city (optional city parameter)\n\n" +
                 "## Usage\n\n" +
                 "1. Connect to the SSE endpoint at `/mcp/sse` with a POST request\n" +
                 "2. Explore available tools with `mcp.capabilities`\n" +

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import config from '../config';
 import { ToolConfig, ResourceConfig } from '../types/mcp';
 import { createLogger } from '../utils/logger';
-import { joiToJsonSchema, getCrawlToolJsonSchema, getCrawlWithMarkdownToolJsonSchema } from '../utils/schemaConverter';
+import { joiToJsonSchema, getCrawlToolJsonSchema, getCrawlWithMarkdownToolJsonSchema, getWebSearchToolJsonSchema, getDateTimeToolJsonSchema } from '../utils/schemaConverter';
 import * as crypto from 'crypto';
 
 interface SessionData {
@@ -212,10 +212,39 @@ export class SimpleMcpServer {
 
       // Set up error handling for client disconnect
       req.on('close', () => {
-        this.logger.info('Client disconnected from Streamable HTTP');
+        this.logger.warn('🔌 CLIENT DISCONNECTED from Streamable HTTP:', {
+          sessionId: session?.sessionId,
+          wasInitialized: session?.initialized,
+          disconnectTime: new Date().toISOString(),
+          hasActiveResponse: !res.writableEnded && !res.headersSent
+        });
+        
         if (this.transportCallbacks.onclose) {
           this.transportCallbacks.onclose();
         }
+      });
+
+      // Track connection abort scenarios that could cause "Close before Response"
+      req.on('aborted', () => {
+        this.logger.error('🚨 CONNECTION ABORTED by client:', {
+          sessionId: session?.sessionId,
+          requestMethod: req.body?.method,
+          abortTime: new Date().toISOString(),
+          responseState: {
+            headersSent: res.headersSent,
+            writableEnded: res.writableEnded,
+            finished: res.finished
+          }
+        });
+      });
+
+      // Track timeout scenarios
+      req.on('timeout', () => {
+        this.logger.error('⏱️ REQUEST TIMEOUT detected:', {
+          sessionId: session?.sessionId,
+          requestMethod: req.body?.method,
+          timeoutTime: new Date().toISOString()
+        });
       });
 
     } catch (error) {
@@ -415,6 +444,10 @@ export class SimpleMcpServer {
         inputSchema = getCrawlToolJsonSchema();
       } else if (t.name === 'crawlWithMarkdown') {
         inputSchema = getCrawlWithMarkdownToolJsonSchema();
+      } else if (t.name === 'webSearch') {
+        inputSchema = getWebSearchToolJsonSchema();
+      } else if (t.name === 'dateTime') {
+        inputSchema = getDateTimeToolJsonSchema();
       } else {
         inputSchema = joiToJsonSchema(t.parameters);
       }
@@ -483,15 +516,36 @@ export class SimpleMcpServer {
 
       const result = await tool.execute(validParams);
       
+      // Log tool execution result details
+      this.logger.info('🔧 TOOL EXECUTION COMPLETED:', {
+        toolName: name,
+        resultType: typeof result,
+        resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
+        success: result && typeof result === 'object' ? result.success : 'unknown',
+        hasError: result && typeof result === 'object' ? !!result.error : false,
+        executionTime: Date.now()
+      });
+
       // Convert result to MCP format
+      const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
       const mcpResult = {
         content: [
           {
             type: 'text',
-            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+            text: resultText
           }
         ]
       };
+
+      // Log the MCP-formatted result before sending
+      this.logger.info('📋 MCP RESULT FORMATTING:', {
+        toolName: name,
+        originalResultSize: typeof result === 'string' ? result.length : JSON.stringify(result).length,
+        mcpFormattedSize: resultText.length,
+        contentType: 'text',
+        textPreview: resultText.substring(0, 300) + (resultText.length > 300 ? '...' : ''),
+        requestId: id
+      });
 
       this.sendMessage(res, { 
         jsonrpc: '2.0', 
@@ -540,6 +594,10 @@ export class SimpleMcpServer {
         inputSchema = getCrawlToolJsonSchema();
       } else if (t.name === 'crawlWithMarkdown') {
         inputSchema = getCrawlWithMarkdownToolJsonSchema();
+      } else if (t.name === 'webSearch') {
+        inputSchema = getWebSearchToolJsonSchema();
+      } else if (t.name === 'dateTime') {
+        inputSchema = getDateTimeToolJsonSchema();
       } else {
         inputSchema = joiToJsonSchema(t.parameters);
       }
@@ -620,13 +678,36 @@ export class SimpleMcpServer {
 
       // Execute tool
       const result = await tool.execute(validation.value);
+      
+      // Log legacy tool execution result details
+      this.logger.info('🔧 LEGACY TOOL EXECUTION COMPLETED:', {
+        toolName: name,
+        resultType: typeof result,
+        resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
+        success: result && typeof result === 'object' ? result.success : 'unknown',
+        hasError: result && typeof result === 'object' ? !!result.error : false,
+        executionTime: Date.now()
+      });
+
+      const resultText = typeof result === 'string' ? result : JSON.stringify(result);
+      
+      // Log the legacy MCP-formatted result before sending
+      this.logger.info('📋 LEGACY MCP RESULT FORMATTING:', {
+        toolName: name,
+        originalResultSize: typeof result === 'string' ? result.length : JSON.stringify(result).length,
+        legacyFormattedSize: resultText.length,
+        contentType: 'text',
+        textPreview: resultText.substring(0, 300) + (resultText.length > 300 ? '...' : ''),
+        requestId: id
+      });
+
       this.sendMessage(res, {
         jsonrpc: '2.0',
         result: {
           content: [
             {
               type: 'text',
-              text: typeof result === 'string' ? result : JSON.stringify(result)
+              text: resultText
             }
           ]
         },
@@ -739,10 +820,57 @@ export class SimpleMcpServer {
    */
   private sendSseMessage(res: Response, message: any): void {
     try {
+      // Log the final message being sent to client via SSE
+      this.logger.info('🚀 FINAL SSE RESPONSE TO CLIENT:', {
+        messageType: message.result ? 'SUCCESS' : 'ERROR',
+        hasResult: !!message.result,
+        hasError: !!message.error,
+        jsonrpcVersion: message.jsonrpc,
+        requestId: message.id,
+        timestamp: new Date().toISOString()
+      });
+
+      // Log detailed content for tool responses
+      if (message.result && message.result.content) {
+        this.logger.info('📦 SSE TOOL RESPONSE CONTENT DETAILS:', {
+          contentType: Array.isArray(message.result.content) ? 'array' : 'object',
+          contentItems: Array.isArray(message.result.content) ? message.result.content.length : 1,
+          contentSummary: Array.isArray(message.result.content) 
+            ? message.result.content.map((item: any) => ({
+                type: item.type,
+                textLength: item.text ? item.text.length : 0,
+                textPreview: item.text ? item.text.substring(0, 200) + '...' : 'N/A'
+              }))
+            : {
+                type: message.result.content.type,
+                textLength: message.result.content.text ? message.result.content.text.length : 0,
+                textPreview: message.result.content.text ? message.result.content.text.substring(0, 200) + '...' : 'N/A'
+              }
+        });
+      }
+
+      // Log the complete message size
+      const messageString = JSON.stringify(message);
+      this.logger.info('📊 SSE RESPONSE SIZE METRICS:', {
+        totalBytes: messageString.length,
+        isLargeResponse: messageString.length > 100000,
+        sizeCategory: messageString.length < 1000 ? 'small' : 
+                     messageString.length < 10000 ? 'medium' : 
+                     messageString.length < 100000 ? 'large' : 'very-large'
+      });
+
       res.write(`data: ${JSON.stringify(message)}\n\n`);
       res.flushHeaders();
+      
+      this.logger.info('✅ SSE RESPONSE SENT SUCCESSFULLY to client');
+      
     } catch (error) {
-      this.logger.error('Error sending SSE message:', error);
+      this.logger.error('💥 ERROR sending SSE message:', error);
+      this.logger.error('🔍 Failed SSE message details:', {
+        messageKeys: Object.keys(message || {}),
+        messageType: typeof message,
+        errorDetails: error instanceof Error ? error.message : String(error)
+      });
     }
   }
   
@@ -751,10 +879,68 @@ export class SimpleMcpServer {
    */
   private sendStreamableHttpMessage(res: Response, message: any): void {
     try {
+      // Log the final message being sent to client for debugging
+      this.logger.info('🚀 FINAL RESPONSE TO CLIENT:', {
+        messageType: message.result ? 'SUCCESS' : 'ERROR',
+        hasResult: !!message.result,
+        hasError: !!message.error,
+        jsonrpcVersion: message.jsonrpc,
+        requestId: message.id,
+        timestamp: new Date().toISOString()
+      });
+
+      // Log detailed content for tool responses
+      if (message.result && message.result.content) {
+        this.logger.info('📦 TOOL RESPONSE CONTENT DETAILS:', {
+          contentType: Array.isArray(message.result.content) ? 'array' : 'object',
+          contentItems: Array.isArray(message.result.content) ? message.result.content.length : 1,
+          contentSummary: Array.isArray(message.result.content) 
+            ? message.result.content.map((item: any) => ({
+                type: item.type,
+                textLength: item.text ? item.text.length : 0,
+                textPreview: item.text ? item.text.substring(0, 200) + '...' : 'N/A'
+              }))
+            : {
+                type: message.result.content.type,
+                textLength: message.result.content.text ? message.result.content.text.length : 0,
+                textPreview: message.result.content.text ? message.result.content.text.substring(0, 200) + '...' : 'N/A'
+              }
+        });
+      }
+
+      // Log error details if present
+      if (message.error) {
+        this.logger.warn('❌ ERROR RESPONSE TO CLIENT:', {
+          errorCode: message.error.code,
+          errorMessage: message.error.message,
+          errorData: message.error.data,
+          requestId: message.id
+        });
+      }
+
+      // Log the complete message size
+      const messageString = JSON.stringify(message);
+      this.logger.info('📊 RESPONSE SIZE METRICS:', {
+        totalBytes: messageString.length,
+        isLargeResponse: messageString.length > 100000, // 100KB threshold
+        sizeCategory: messageString.length < 1000 ? 'small' : 
+                     messageString.length < 10000 ? 'medium' : 
+                     messageString.length < 100000 ? 'large' : 'very-large'
+      });
+
       // For streamable HTTP, send the complete JSON response and end
       res.json(message);
+      
+      this.logger.info('✅ RESPONSE SENT SUCCESSFULLY to client');
+      
     } catch (error) {
-      this.logger.error('Error sending Streamable HTTP message:', error);
+      this.logger.error('💥 ERROR sending Streamable HTTP message:', error);
+      this.logger.error('🔍 Failed message details:', {
+        messageKeys: Object.keys(message || {}),
+        messageType: typeof message,
+        errorDetails: error instanceof Error ? error.message : String(error)
+      });
+      
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
