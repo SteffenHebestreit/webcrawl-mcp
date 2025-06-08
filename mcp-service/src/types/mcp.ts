@@ -204,6 +204,7 @@ export interface ExtractLinksParams {
   includeFragments?: boolean; // Include links with URL fragments (#section)
   includeQueryParams?: boolean; // Include links with query parameters (?param=value)
   categorizeLinks?: boolean; // Categorize links by type (navigation, content, etc.)
+  includeExternalLinks?: boolean; // Include external links (links to other domains)
   maxLinks?: number; // Maximum number of links to return
   sortBy?: "url" | "text" | "relevance"; // How to sort the results
 }
@@ -218,6 +219,7 @@ export interface ExtractLinksResponse {
     type: "navigation" | "content" | "media" | "form" | "other";
     depth: number; // URL path depth (number of segments)
     section?: string; // Which section of the page the link was found in
+    isExternal: boolean; // Whether the link points to an external domain
   }>;
   linksByType?: {
     navigation: number;
@@ -227,6 +229,8 @@ export interface ExtractLinksResponse {
     other: number;
   };
   totalLinks: number;
+  internalLinks: number; // Count of internal links
+  externalLinks: number; // Count of external links
   pageTitle?: string;
   baseUrl: string;
   error?: string;

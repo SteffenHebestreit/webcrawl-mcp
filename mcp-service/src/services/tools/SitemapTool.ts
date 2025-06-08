@@ -1,4 +1,4 @@
-import { SmartCrawlParams, SmartCrawlResponse } from '../../types/mcp';
+import { SitemapGeneratorParams, SitemapGeneratorResponse } from '../../types/mcp';
 import { Browser, Page } from 'puppeteer';
 import puppeteer from 'puppeteer';
 import path from 'path';
@@ -6,13 +6,14 @@ import { promises as fs } from 'fs';
 import { BaseTool } from './BaseTool';
 
 /**
- * Tool service for intelligent crawling with relevance scoring
+ * Tool service for generating sitemaps
+ * Includes all crawler functionality directly in the tool implementation
  */
-export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlResponse> {
+export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGeneratorResponse> {
   private tmpDir: string;
 
   constructor() {
-    super('SmartCrawlTool');
+    super('SitemapTool');
     
     // Define temporary directory for screenshots and other artifacts
     this.tmpDir = path.join(process.cwd(), '.tmp', 'crawl-artifacts');
@@ -34,31 +35,52 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
   }
 
   /**
-   * Execute smart crawl with relevance scoring
+   * Execute sitemap generation
    */
-  public async execute(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
-    this.logger.info('Executing smartCrawl with params:', params);
+  public async execute(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
+    this.logger.info('Executing sitemap generation with params:', params);
     
     try {
-      const crawlResult = await this.executeSmartCrawl(params);      if (!crawlResult.success) {
+      const sitemapResult = await this.generateSitemap(params);
+
+      if (!sitemapResult.success) {
         return {
           success: false,
           url: params.url,
-          query: params.query,
-          relevantPages: [],
-          overallSummary: 'Smart crawl failed',
-          error: crawlResult.error || 'Smart crawl failed'
+          sitemap: [],
+          statistics: {
+            totalPages: 0,
+            successfulPages: 0,
+            errorPages: 0,
+            externalLinks: 0,
+            maxDepthReached: 0,
+            crawlDuration: 0
+          },
+          hierarchy: {},
+          baseUrl: params.url,
+          crawlTimestamp: new Date().toISOString(),
+          error: sitemapResult.error || 'Sitemap generation failed'
         };
       }
 
-      return crawlResult;    } catch (error: any) {
-      this.logger.error('Error in SmartCrawlTool execute:', error);
+      return sitemapResult;
+    } catch (error: any) {
+      this.logger.error('Error in SitemapTool execute:', error);
       return {
         success: false,
         url: params.url,
-        query: params.query,
-        relevantPages: [],
-        overallSummary: 'Error occurred during smart crawl',
+        sitemap: [],
+        statistics: {
+          totalPages: 0,
+          successfulPages: 0,
+          errorPages: 0,
+          externalLinks: 0,
+          maxDepthReached: 0,
+          crawlDuration: 0
+        },
+        hierarchy: {},
+        baseUrl: params.url,
+        crawlTimestamp: new Date().toISOString(),
         error: error.message
       };
     }
@@ -175,57 +197,55 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
   }
 
   /**
-   * Calculate relevance score for content based on query
+   * Generate sitemap for a website
    */
-  private calculateRelevanceScore(content: string, query: string): number {
-    if (!query || !content) return 0;
+  private async generateSitemap(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
+    this.logger.info(`Starting sitemap generation for: ${params.url}`);
     
-    const queryTerms = query.toLowerCase().split(/\s+/);
-    const contentLower = content.toLowerCase();
-    
-    let score = 0;
-    queryTerms.forEach(term => {
-      // Count occurrences of each term
-      const matches = (contentLower.match(new RegExp(term, 'g')) || []).length;
-      score += matches;
-    });
-    
-    // Normalize score by content length
-    return Math.min(score / Math.max(content.length / 1000, 1), 10);
-  }
-
-  /**
-   * Execute smart crawl with relevance scoring
-   */
-  private async executeSmartCrawl(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
-    this.logger.info(`Starting smart crawl for: ${params.url} with query: ${params.query}`);
-    
-    const maxPages = params.maxPages || 5;
-    const depth = params.depth || 2;
-    const relevanceThreshold = params.relevanceThreshold || 2;
+    const startTime = Date.now();
+    const maxDepth = params.depth || 3;
+    const maxUrls = params.maxPages || 100;
+    const includeExternal = params.includeExternalLinks || false;
     
     const visitedUrls = new Set<string>();
-    const pagesToVisit: Array<{ url: string; depth: number }> = [{ url: params.url, depth: 0 }];
-    const results: Array<{
+    const urlsToVisit: Array<{ url: string; depth: number; parentUrl?: string }> = [{ url: params.url, depth: 0 }];
+    const sitemap: Array<{
       url: string;
-      title: string;
-      content: string;
-      relevanceScore: number;
-      links: Array<{ url: string; text: string; title?: string }>;
+      title?: string;
+      description?: string;
       depth: number;
+      parentUrl?: string;
+      status: "crawled" | "error" | "excluded" | "external";
+      lastModified?: string;
+      contentType?: string;
+      wordCount?: number;
+      headings?: {
+        h1?: string[];
+        h2?: string[];
+        h3?: string[];
+      };
+      error?: string;
     }> = [];
+    const hierarchy: { [url: string]: string[] } = {};
+    let successfulPages = 0;
+    let errorPages = 0;
+    let externalLinks = 0;
+    let maxDepthReached = 0;
     
     const browser = await this.launchBrowser();
     
     try {
-      while (pagesToVisit.length > 0 && results.length < maxPages) {
-        const { url, depth: currentDepth } = pagesToVisit.shift()!;
+      const baseUrl = new URL(params.url);
+      
+      while (urlsToVisit.length > 0 && sitemap.length < maxUrls) {
+        const { url, depth, parentUrl } = urlsToVisit.shift()!;
         
-        if (visitedUrls.has(url) || currentDepth > depth) {
+        if (visitedUrls.has(url) || depth > maxDepth) {
           continue;
         }
         
         visitedUrls.add(url);
+        maxDepthReached = Math.max(maxDepthReached, depth);
         
         try {
           const page = await this.createStandardPage(browser);
@@ -239,49 +259,81 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
           // Extract page data
           const pageData = await page.evaluate(() => {
             const title = document.title;
+            const description = (document.querySelector('meta[name="description"]') as HTMLMetaElement)?.content;
+            const contentType = document.contentType;
             const content = document.body?.innerText || '';
             
+            // Extract headings
+            const h1Elements = Array.from(document.querySelectorAll('h1')).map(h => h.textContent?.trim()).filter(Boolean);
+            const h2Elements = Array.from(document.querySelectorAll('h2')).map(h => h.textContent?.trim()).filter(Boolean);
+            const h3Elements = Array.from(document.querySelectorAll('h3')).map(h => h.textContent?.trim()).filter(Boolean);
+            
             // Extract links
-            const links: Array<{ url: string; text: string; title?: string }> = [];
+            const links: string[] = [];
             document.querySelectorAll('a[href]').forEach((anchor) => {
               const element = anchor as HTMLAnchorElement;
               const href = element.href;
-              const text = element.textContent?.trim() || '';
-              const title = element.title;
-              
-              if (text && href) {
-                links.push({ url: href, text, title });
+              if (href) {
+                links.push(href);
               }
             });
             
-            return { title, content, links };
+            return {
+              title,
+              description,
+              contentType,
+              content,
+              wordCount: content.split(/\s+/).length,
+              headings: {
+                h1: h1Elements.length > 0 ? h1Elements as string[] : undefined,
+                h2: h2Elements.length > 0 ? h2Elements as string[] : undefined,
+                h3: h3Elements.length > 0 ? h3Elements as string[] : undefined
+              },
+              links
+            };
           });
           
-          // Calculate relevance score
-          const relevanceScore = this.calculateRelevanceScore(pageData.content, params.query);
+          // Add to sitemap
+          sitemap.push({
+            url,
+            title: pageData.title,
+            description: pageData.description,
+            depth,
+            parentUrl,
+            status: "crawled",
+            lastModified: new Date().toISOString(),
+            contentType: pageData.contentType,
+            wordCount: pageData.wordCount,
+            headings: pageData.headings
+          });
           
-          // Add to results if relevant enough
-          if (relevanceScore >= relevanceThreshold) {
-            results.push({
-              url,
-              title: pageData.title,
-              content: pageData.content.substring(0, 2000), // Limit content length
-              relevanceScore,
-              links: pageData.links.slice(0, 20), // Limit links
-              depth: currentDepth
-            });
+          successfulPages++;
+          
+          // Add child URLs to hierarchy
+          if (!hierarchy[url]) {
+            hierarchy[url] = [];
           }
           
-          // Add new pages to visit (only internal links)
-          if (currentDepth < depth) {
+          // Add new URLs to visit
+          if (depth < maxDepth) {
             pageData.links.forEach(link => {
               try {
-                const linkUrl = new URL(link.url);
-                const baseUrl = new URL(params.url);
+                const linkUrl = new URL(link);
                 
-                // Only add internal links
-                if (linkUrl.origin === baseUrl.origin && !visitedUrls.has(link.url)) {
-                  pagesToVisit.push({ url: link.url, depth: currentDepth + 1 });
+                // Check if internal or external
+                if (linkUrl.origin === baseUrl.origin) {
+                  if (!visitedUrls.has(link)) {
+                    urlsToVisit.push({ url: link, depth: depth + 1, parentUrl: url });
+                    hierarchy[url].push(link);
+                  }
+                } else if (includeExternal) {
+                  externalLinks++;
+                  sitemap.push({
+                    url: link,
+                    depth: depth + 1,
+                    parentUrl: url,
+                    status: "external"
+                  });
                 }
               } catch (e) {
                 // Skip invalid URLs
@@ -292,50 +344,64 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
           await page.close();
           
         } catch (error: any) {
-          this.logger.warn(`Failed to crawl ${url}:`, error.message);
+          this.logger.warn(`Failed to process ${url}:`, error.message);
+          errorPages++;
+          
+          sitemap.push({
+            url,
+            depth,
+            parentUrl,
+            status: "error",
+            error: error.message
+          });
         }
       }
-        // Sort results by relevance score
-      results.sort((a, b) => b.relevanceScore - a.relevanceScore);
       
-      // Convert results to SmartCrawlResponse format
-      const relevantPages = results.map(page => ({
-        url: page.url,
-        title: page.title,
-        summary: page.content.substring(0, 300) + (page.content.length > 300 ? '...' : ''),
-        relevanceScore: page.relevanceScore,
-        keyFindings: page.content.split('\n').filter(line => line.trim().length > 50).slice(0, 3)
-      }));
+      const crawlDuration = Date.now() - startTime;
       
-      const overallSummary = results.length > 0 
-        ? `Found ${results.length} relevant pages out of ${visitedUrls.size} visited. Average relevance score: ${(results.reduce((sum, page) => sum + page.relevanceScore, 0) / results.length).toFixed(2)}`
-        : `No relevant pages found out of ${visitedUrls.size} visited pages.`;
-      
-      this.logger.info(`Smart crawl completed. Found ${results.length} relevant pages out of ${visitedUrls.size} visited`);
+      this.logger.info(`Sitemap generation completed. Generated ${sitemap.length} entries`);
       
       return {
         success: true,
         url: params.url,
-        query: params.query,
-        relevantPages,
-        overallSummary
+        sitemap,
+        statistics: {
+          totalPages: visitedUrls.size,
+          successfulPages,
+          errorPages,
+          externalLinks,
+          maxDepthReached,
+          crawlDuration
+        },
+        hierarchy,
+        baseUrl: baseUrl.origin,
+        crawlTimestamp: new Date().toISOString()
       };
       
     } catch (error: any) {
-      this.logger.error(`Error in smart crawl:`, error);
+      this.logger.error(`Error in sitemap generation:`, error);
       
       return {
         success: false,
         url: params.url,
-        query: params.query,
-        relevantPages: [],
-        overallSummary: 'Smart crawl failed due to error',
+        sitemap: [],
+        statistics: {
+          totalPages: 0,
+          successfulPages: 0,
+          errorPages: 0,
+          externalLinks: 0,
+          maxDepthReached: 0,
+          crawlDuration: Date.now() - startTime
+        },
+        hierarchy: {},
+        baseUrl: params.url,
+        crawlTimestamp: new Date().toISOString(),
         error: error.message
       };
     } finally {
       if (browser) {
         await browser.close();
-        this.logger.info(`Browser closed for smart crawl operation`);
+        this.logger.info(`Browser closed for sitemap generation`);
       }
     }
   }

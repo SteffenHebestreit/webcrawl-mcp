@@ -2,11 +2,14 @@ import { DateTimeParams, DateTimeResponse } from '../../types/mcp';
 import { createLogger } from '../../utils/logger';
 import { format, getWeek, getDayOfYear, getQuarter } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { BaseTool } from './BaseTool';
 
-export class DateTimeTool {
-  private logger = createLogger('DateTimeTool');
+export class DateTimeTool extends BaseTool<DateTimeParams, DateTimeResponse> {
+  constructor() {
+    super('DateTimeTool');
+  }
 
-  public async executeDateTime(params: DateTimeParams): Promise<DateTimeResponse> {
+  public async execute(params: DateTimeParams): Promise<DateTimeResponse> {
     this.logger.info('Executing dateTime with params:', params);
     
     try {
