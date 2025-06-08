@@ -1,16 +1,14 @@
 import { Router, Request, Response } from 'express';
 import config from '../config';
 import { ToolController } from '../controllers/toolController';
-import { CrawlExecutionService } from '../services/crawlExecutionService';
 import { createLogger } from '../utils/logger';
 
 export function setupApiRoutes(): Router {
   const router = Router();
   const logger = createLogger('API-Routes');
   
-  // Initialize crawl service and tool controller for direct API access
-  const crawlExecutor = new CrawlExecutionService();
-  const toolController = new ToolController(config, crawlExecutor);
+  // Initialize tool controller for direct API access
+  const toolController = new ToolController(config);
 
   // Add a basic health check endpoint
   router.get('/health', (req: Request, res: Response) => {

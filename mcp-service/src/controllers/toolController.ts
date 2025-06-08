@@ -1,10 +1,12 @@
 import Joi from 'joi';
 import config from '../config';
-import { CrawlExecutionService } from '../services/crawlExecutionService';
 import { DateTimeTool } from '../services/tools/DateTimeTool';
-import { ContentCrawler } from '../services/crawlers/ContentCrawler';
-import { LinkCrawler } from '../services/crawlers/LinkCrawler';
-import { SitemapCrawler } from '../services/crawlers/SitemapCrawler';
+import { CrawlTool } from '../services/tools/CrawlTool';
+import { ExtractLinksTool } from '../services/tools/ExtractLinksTool';
+import { SmartCrawlTool } from '../services/tools/SmartCrawlTool';
+import { SitemapTool } from '../services/tools/SitemapTool';
+import { SearchInPageTool } from '../services/tools/SearchInPageTool';
+import { WebSearchTool } from '../services/tools/WebSearchTool';
 import {
   CrawlParams,
   CrawlResponse,
@@ -30,19 +32,23 @@ import { createLogger } from '../utils/logger';
  * Controller for handling MCP tool operations
  */
 export class ToolController {
-  private crawlExecutor: CrawlExecutionService;
   private dateTimeTool: DateTimeTool;
-  private contentCrawler: ContentCrawler;
-  private linkCrawler: LinkCrawler;
-  private sitemapCrawler: SitemapCrawler;
+  private crawlTool: CrawlTool;
+  private extractLinksTool: ExtractLinksTool;
+  private smartCrawlTool: SmartCrawlTool;
+  private sitemapTool: SitemapTool;
+  private searchInPageTool: SearchInPageTool;
+  private webSearchTool: WebSearchTool;
   private logger = createLogger('ToolController');
 
-  constructor(config: any, crawlExecutor: CrawlExecutionService) {
-    this.crawlExecutor = crawlExecutor;
+  constructor(config: any) {
     this.dateTimeTool = new DateTimeTool();
-    this.contentCrawler = new ContentCrawler();
-    this.linkCrawler = new LinkCrawler();
-    this.sitemapCrawler = new SitemapCrawler();
+    this.crawlTool = new CrawlTool();
+    this.extractLinksTool = new ExtractLinksTool();
+    this.smartCrawlTool = new SmartCrawlTool();
+    this.sitemapTool = new SitemapTool();
+    this.searchInPageTool = new SearchInPageTool();
+    this.webSearchTool = new WebSearchTool();
   }
 
   /**
@@ -201,16 +207,15 @@ export class ToolController {
    */
   getExtractLinksToolConfig(): ToolConfig<ExtractLinksParams, ExtractLinksResponse> {
     return {
-      name: "extractLinks",
-      parameters: Joi.object({
+      name: "extractLinks",      parameters: Joi.object({
         url: Joi.string().uri().required().messages({'string.uri': 'Please provide a valid URL'}),
         includeFragments: Joi.boolean().optional().default(true),
         includeQueryParams: Joi.boolean().optional().default(true),
         categorizeLinks: Joi.boolean().optional().default(true),
+        includeExternalLinks: Joi.boolean().optional().default(true),
         maxLinks: Joi.number().integer().min(1).max(500).optional().default(100),
         sortBy: Joi.string().valid("url", "text", "relevance").optional().default("relevance")
-      }),
-      returns: Joi.object({
+      }),      returns: Joi.object({
         success: Joi.boolean().required(),
         url: Joi.string().uri().required(),
         links: Joi.array().items(Joi.object({
@@ -219,7 +224,8 @@ export class ToolController {
           title: Joi.string().optional(),
           type: Joi.string().valid("navigation", "content", "media", "form", "other").required(),
           depth: Joi.number().required(),
-          section: Joi.string().optional()
+          section: Joi.string().optional(),
+          isExternal: Joi.boolean().required()
         })).required(),
         linksByType: Joi.object({
           navigation: Joi.number().required(),
@@ -229,14 +235,15 @@ export class ToolController {
           other: Joi.number().required()
         }).optional(),
         totalLinks: Joi.number().required(),
+        internalLinks: Joi.number().required(),
+        externalLinks: Joi.number().required(),
         pageTitle: Joi.string().optional(),
         baseUrl: Joi.string().required(),
         error: Joi.string().optional()
-      }),
-      execute: this.executeExtractLinks.bind(this),
-      description: "Extract all internal links from a webpage.",
-      parameterDescription: "Required: url | Optional: includeFragments (default: true), maxLinks (default: 100), sortBy (default: 'relevance').",
-      returnDescription: "Links categorized by type with metadata and statistics."
+      }),      execute: this.executeExtractLinks.bind(this),
+      description: "Extract all links (both internal and external) from a webpage.",
+      parameterDescription: "Required: url | Optional: includeFragments (default: true), includeExternalLinks (default: true), maxLinks (default: 100), sortBy (default: 'relevance').",
+      returnDescription: "Links categorized by type with metadata and statistics. Links are marked as internal or external."
     };
   }
 
@@ -366,50 +373,28 @@ export class ToolController {
       returnDescription: "Current date and time in multiple formats with timezone and additional calendar information."
     };
   }
-
   /**
-   * Execute the basic crawl operation using CrawlExecutionService
+   * Execute the basic crawl operation using CrawlTool
    */
   private async executeCrawl(params: CrawlParams): Promise<CrawlResponse> {
-    this.logger.info('Executing crawl with params:', params);
-    try {
-      const result = await this.crawlExecutor.executeCrawl(params.url, params);      return {
-        success: result.success,
-        url: result.url,
-        query: params.query,
-        text: result.text ?? (result.success ? 'No text content extracted.' : 'Error occurred during crawl.'),
-        tables: result.media?.tables ?? [],
-        contentSummary: result.success ? `Content extracted for query: "${params.query}"` : undefined,
-        relevanceScore: result.success ? 8.0 : 0,
-        pagesVisited: 1,
-        totalContentLength: result.text?.length || 0,
-        processingTime: 0,
-        error: result.error
-      };
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeCrawl:', error);      return {
-        success: false,
-        url: params.url,
-        query: params.query,
-        text: `Failed to execute crawl: ${error.message}`,
-        tables: [],
-        contentSummary: `Failed to extract content for query: "${params.query}"`,
-        relevanceScore: 0,
-        pagesVisited: 0,
-        totalContentLength: 0,
-        processingTime: 0,
-        error: error.message
-      };
-    }
+    return await this.crawlTool.execute(params);
   }
-
   /**
-   * Execute the markdown crawl operation using CrawlExecutionService
-   */  private async executeCrawlWithMarkdown(params: CrawlWithMarkdownParams): Promise<CrawlWithMarkdownResponse> {
+   * Execute the markdown crawl operation using CrawlTool
+   */
+  private async executeCrawlWithMarkdown(params: CrawlWithMarkdownParams): Promise<CrawlWithMarkdownResponse> {
     this.logger.info('Executing crawlWithMarkdown with params:', params);
     try {
-      // First get the raw content using ContentCrawler directly
-      const result = await this.crawlExecutor.executeCrawl(params.url, params);
+      // First get the raw content using CrawlTool directly
+      const crawlParams: CrawlParams = {
+        url: params.url,
+        query: params.query || `Extract content from ${params.url}`,
+        maxPages: params.maxPages || 1,
+        depth: params.depth || 0,
+        strategy: params.strategy || 'bestFirst'
+      };
+      
+      const result = await this.crawlTool.execute(crawlParams);
       
       if (!result.success || !result.text) {
         return {
@@ -458,7 +443,8 @@ export class ToolController {
         error: result.error
       };
     } catch (error: any) {
-      this.logger.error('Error in ToolController executeCrawlWithMarkdown:', error);      return {
+      this.logger.error('Error in ToolController executeCrawlWithMarkdown:', error);
+      return {
         success: false,
         url: params.url,
         query: params.query || `Content from ${params.url}`,
@@ -473,346 +459,34 @@ export class ToolController {
 
   /**
    * Execute date/time tool using DateTimeTool service
-   */
-  private async executeDateTime(params: DateTimeParams): Promise<DateTimeResponse> {
-    return await this.dateTimeTool.executeDateTime(params);
+   */  private async executeDateTime(params: DateTimeParams): Promise<DateTimeResponse> {
+    return await this.dateTimeTool.execute(params);
   }
-
   /**
    * Execute web search using the selected search engine
    */
   private async executeWebSearch(params: WebSearchParams): Promise<WebSearchResponse> {
-    this.logger.info('Executing webSearch with params:', params);
-    
-    try {
-      const result = await this.crawlExecutor.executeWebSearch(
-        params.query,
-        params.engine || 'duckduckgo',
-        params.numResults || 10,
-        params.safeSearch !== undefined ? params.safeSearch : true,
-        params.timeRange
-      );
-      return result;
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeWebSearch:', error);
-      return {
-        success: false,
-        query: params.query,
-        engine: params.engine || 'duckduckgo',
-        results: [],
-        totalResults: 0,
-        searchTimeMs: 0,
-        error: error.message
-      };
-    }
-  }  /**
+    return await this.webSearchTool.execute(params);
+  }/**
    * Execute search within a specific page
    */
   private async executeSearchInPage(params: SearchInPageParams): Promise<SearchInPageResponse> {
-    this.logger.info('Executing searchInPage with params:', params);
-    try {
-      // First crawl the page to get content
-      const crawlResult = await this.crawlExecutor.executeCrawl(params.url, {
-        url: params.url,
-        query: params.query,
-        maxPages: 1,
-        depth: 0,
-        strategy: 'bfs'
-      });
-
-      if (!crawlResult.success) {
-        return {
-          success: false,
-          url: params.url,
-          query: params.query,
-          matches: [],
-          summary: '',
-          totalMatches: 0,
-          error: crawlResult.error || 'Failed to crawl page for search'
-        };
-      }
-
-      // Search within the crawled content
-      const searchResults = this.crawlExecutor.searchInContent(crawlResult.text || '', params.query);
-      const maxResults = params.maxResults || 10;
-      const limitedMatches = searchResults.matches.slice(0, maxResults);
-
-      return {
-        success: true,
-        url: params.url,
-        query: params.query,
-        matches: limitedMatches,
-        summary: searchResults.summary,
-        totalMatches: searchResults.matches.length,
-        error: undefined
-      };
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeSearchInPage:', error);
-      return {
-        success: false,
-        url: params.url,
-        query: params.query,
-        matches: [],
-        summary: '',
-        totalMatches: 0,
-        error: error.message
-      };
-    }
+    return await this.searchInPageTool.execute(params);
   }  /**
    * Execute smart crawl with relevance scoring
    */
   private async executeSmartCrawl(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
-    this.logger.info('Executing smartCrawl with params:', params);
-    try {
-      // Perform crawl with query for enhanced relevance
-      const crawlResult = await this.crawlExecutor.executeCrawl(params.url, {
-        url: params.url,
-        maxPages: params.maxPages || 5,
-        depth: params.depth || 2,
-        strategy: 'bestFirst',
-        query: params.query
-      });
-
-      if (!crawlResult.success) {
-        return {
-          success: false,
-          url: params.url,
-          query: params.query,
-          relevantPages: [],
-          overallSummary: '',
-          error: crawlResult.error || 'Failed to perform smart crawl'
-        };
-      }
-
-      // Analyze the crawled content for relevance
-      const searchResults = this.crawlExecutor.searchInContent(crawlResult.text || '', params.query);
-      const relevanceThreshold = params.relevanceThreshold || 2;
-      
-      // Check if this is a lottery-related query
-      const isLotteryQuery = /lott(ery|o)|jackpot|eurojackpot|winning|numbers|gewinn|zahlen/i.test(params.query);
-      this.logger.info(`Query "${params.query}" is ${isLotteryQuery ? 'detected as lottery-related' : 'not lottery-related'}`);
-      
-      // Define the page entry type
-      type PageEntry = {
-        url: string;
-        title: string;
-        summary: string;
-        relevanceScore: number;
-        keyFindings: string[];
-      };
-      
-      // Set up a default relevant page entry
-      const relevantPageEntry: PageEntry = {
-        url: params.url,
-        title: 'Main Page',
-        summary: searchResults.summary,
-        relevanceScore: searchResults.matches.length > 0 ? 
-          Math.max(...searchResults.matches.map(m => m.relevance)) : 0,
-        keyFindings: searchResults.matches
-          .filter(m => m.relevance >= relevanceThreshold)
-          .slice(0, 5)
-          .map(m => m.snippet.substring(0, 100) + '...')
-      };
-      
-      // If no matches are found but we have content, use the content directly
-      if ((searchResults.matches.length === 0 || relevantPageEntry.keyFindings.length === 0) && 
-          crawlResult.text && crawlResult.text.length > 0) {
-        this.logger.info('No strong matches found, but content exists. Creating fallback summary.');
-        // Use the raw content as summary
-        relevantPageEntry.summary = crawlResult.text.substring(0, Math.min(1500, crawlResult.text.length));
-        // Set a minimal relevance score to ensure it passes filtering
-        relevantPageEntry.relevanceScore = isLotteryQuery ? 3.0 : 0.5;
-        // Create some key findings from the text
-        const lines = crawlResult.text.split('\n').filter(line => line.trim().length > 0);
-        relevantPageEntry.keyFindings = lines.slice(0, 5).map(line => line.substring(0, 100) + '...');
-      }
-      
-      // For lottery queries, always return content
-      let relevantPages: PageEntry[] = [];
-      if (isLotteryQuery) {
-        // For lottery queries, always include the page regardless of relevance
-        relevantPages = [relevantPageEntry];
-        this.logger.info('Including content regardless of relevance score due to lottery query');
-      } else if (crawlResult.text && crawlResult.text.length > 100 && searchResults.matches.length === 0) {
-        // If we have content but no matches, include it as a fallback
-        relevantPages = [relevantPageEntry];
-        this.logger.info('Including content as fallback since we have text but no matches');
-      } else {
-        // For other queries, apply the standard relevance threshold filter
-        relevantPages = relevantPageEntry.relevanceScore >= relevanceThreshold ? [relevantPageEntry] : [];
-      }
-
-      const overallSummary = relevantPages.length > 0 
-        ? `Found ${searchResults.matches.length} relevant matches for "${params.query}". ${searchResults.summary}`
-        : `No content meeting the relevance threshold was found for "${params.query}".`;
-
-      return {
-        success: true,
-        url: params.url,
-        query: params.query,
-        relevantPages,
-        overallSummary,
-        error: undefined
-      };
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeSmartCrawl:', error);
-      return {
-        success: false,
-        url: params.url,
-        query: params.query,
-        relevantPages: [],
-        overallSummary: '',
-        error: error.message
-      };
-    }
+    return await this.smartCrawlTool.execute(params);
   }  /**
    * Execute link extraction from a specific page
    */
   private async executeExtractLinks(params: ExtractLinksParams): Promise<ExtractLinksResponse> {
-    this.logger.info('Executing extractLinks with params:', params);
-    
-    try {
-      // Use the crawl service to extract enhanced links
-      const extractedLinks = await this.crawlExecutor.extractInternalLinks(
-        params.url,
-        params.includeFragments ?? true,
-        params.includeQueryParams ?? true,
-        params.categorizeLinks ?? true,
-        params.maxLinks ?? 100
-      );
-
-      if (!extractedLinks.success) {
-        return {
-          success: false,
-          url: params.url,
-          links: [],
-          totalLinks: 0,
-          baseUrl: params.url,
-          error: extractedLinks.error || 'Failed to extract links'
-        };
-      }
-
-      // Sort links according to the requested sorting method
-      let sortedLinks = extractedLinks.links;
-      switch (params.sortBy) {
-        case 'url':
-          sortedLinks = sortedLinks.sort((a, b) => a.url.localeCompare(b.url));
-          break;
-        case 'text':
-          sortedLinks = sortedLinks.sort((a, b) => a.text.localeCompare(b.text));
-          break;
-        case 'relevance':
-        default:
-          // Sort by type priority and then by text length
-          const typePriority = { navigation: 1, content: 2, media: 3, form: 4, other: 5 };
-          sortedLinks = sortedLinks.sort((a, b) => {
-            const typeDiff = typePriority[a.type] - typePriority[b.type];
-            if (typeDiff !== 0) return typeDiff;
-            return b.text.length - a.text.length;
-          });
-          break;
-      }
-
-      // Count links by type for categorizeLinks option
-      const linksByType = params.categorizeLinks ? {
-        navigation: sortedLinks.filter(l => l.type === 'navigation').length,
-        content: sortedLinks.filter(l => l.type === 'content').length,
-        media: sortedLinks.filter(l => l.type === 'media').length,
-        form: sortedLinks.filter(l => l.type === 'form').length,
-        other: sortedLinks.filter(l => l.type === 'other').length
-      } : undefined;
-
-      return {
-        success: true,
-        url: params.url,
-        links: sortedLinks,
-        linksByType,
-        totalLinks: sortedLinks.length,
-        pageTitle: extractedLinks.pageTitle,
-        baseUrl: extractedLinks.baseUrl,
-        error: undefined
-      };
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeExtractLinks:', error);
-      return {
-        success: false,
-        url: params.url,
-        links: [],
-        totalLinks: 0,
-        baseUrl: params.url,
-        error: error.message
-      };
-    }
+    return await this.extractLinksTool.execute(params);
   }
-
   /**
    * Execute sitemap generation
    */
   private async executeGenerateSitemap(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
-    this.logger.info('Executing generateSitemap with params:', params);
-    const startTime = Date.now();
-    
-    try {
-      const sitemapResult = await this.crawlExecutor.generateSitemap(
-        params.url,
-        params.depth ?? 2,
-        params.maxPages ?? 50,
-        params.includeExternalLinks ?? false,
-        params.respectRobotsTxt ?? true,
-        params.followRedirects ?? true,
-        params.excludePatterns ?? [],
-        params.includeMetadata ?? true
-      );
-
-      if (!sitemapResult.success) {
-        return {
-          success: false,
-          url: params.url,
-          sitemap: [],
-          statistics: {
-            totalPages: 0,
-            successfulPages: 0,
-            errorPages: 1,
-            externalLinks: 0,
-            maxDepthReached: 0,
-            crawlDuration: Date.now() - startTime
-          },
-          hierarchy: {},
-          baseUrl: params.url,
-          crawlTimestamp: new Date().toISOString(),
-          error: sitemapResult.error || 'Failed to generate sitemap'
-        };
-      }
-
-      return {
-        success: true,
-        url: params.url,
-        sitemap: sitemapResult.sitemap,
-        statistics: sitemapResult.statistics,
-        hierarchy: sitemapResult.hierarchy,
-        baseUrl: sitemapResult.baseUrl,
-        crawlTimestamp: new Date().toISOString(),
-        error: undefined
-      };
-    } catch (error: any) {
-      this.logger.error('Error in ToolController executeGenerateSitemap:', error);
-      return {
-        success: false,
-        url: params.url,
-        sitemap: [],
-        statistics: {
-          totalPages: 0,
-          successfulPages: 0,
-          errorPages: 1,
-          externalLinks: 0,
-          maxDepthReached: 0,
-          crawlDuration: Date.now() - startTime
-        },
-        hierarchy: {},
-        baseUrl: params.url,
-        crawlTimestamp: new Date().toISOString(),
-        error: error.message
-      };
-    }
+    return await this.sitemapTool.execute(params);
   }
 }

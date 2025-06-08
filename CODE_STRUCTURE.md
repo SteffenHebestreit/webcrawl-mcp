@@ -138,24 +138,89 @@ This document provides an overview of the source code structure of the MCP-Serve
 
 ### Services (src/services/)
 
-- crawlExecutionService.ts
-  : Advanced web crawling service with Puppeteer integration. Features include:
-    - **Browser Management**: Robust browser initialization with error handling and custom executable path support
-    - **Content Extraction**: Text extraction, HTML-to-Markdown conversion, and table extraction
-    - **Multiple Crawling Strategies**: BFS, DFS, and best-first search algorithms
-    - **Advanced Features**: Screenshot capture, network traffic monitoring, and multi-page crawling
-    - **Error Resilience**: Comprehensive error handling, timeout management, and connection recovery
+#### Tools (src/services/tools/)
+The service layer has been refactored into a tool-based architecture where each tool is self-contained with its own browser management and crawling logic:
+
+- **BaseTool.ts**
+  : Abstract base class providing common functionality for all tools including browser management, error handling, and logging.
+
+- **CrawlTool.ts**
+  : Basic web crawling tool with content extraction capabilities. Features include:
+    - Text extraction and table processing
+    - Multiple crawling strategies (BFS, DFS, best-first)
+    - Screenshot capture and network monitoring
+    - Self-contained browser management
+
+- **SmartCrawlTool.ts**
+  : Intelligent crawling tool with markdown output and query support. Features include:
+    - HTML-to-Markdown conversion with custom formatting
+    - Query-based content filtering and relevance scoring
+    - Enhanced content detection for specialized sites
+    - Structured markdown output with proper headings
+
+- **ExtractLinksTool.ts**
+  : Specialized tool for link extraction and categorization. Features include:
+    - Internal vs external link classification
+    - Link text and description extraction
+    - Comprehensive link discovery within page content
+
+- **SitemapTool.ts**
+  : Sitemap generation tool for creating structured site maps. Features include:
+    - Hierarchical sitemap structure
+    - Configurable crawling depth
+    - URL relationship mapping
+
+- **SearchInPageTool.ts**
+  : Content search tool for finding specific terms within web pages. Features include:
+    - Text search with context extraction
+    - Relevance scoring for search results
+    - Match highlighting and positioning
+
+- **WebSearchTool.ts**
+  : Web search integration tool for performing searches and extracting results. Features include:
+    - Search result extraction (titles, descriptions, URLs)
+    - Configurable result limits
+    - Result processing and formatting
+
+- **DateTimeTool.ts**
+  : Utility tool for date and time operations. Features include:
+    - Current date/time in multiple formats
+    - Timezone conversion support
+    - Flexible formatting options
+
+- **index.ts**
+  : Module exports for all tool implementations.
 
 ### Types (src/types/)
 
-- mcp.ts
-  : TypeScript types for MCP messages and requests.
-- modelcontextprotocol.d.ts
+### Types (src/types/)
+
+- **mcp.ts**
+  : TypeScript types for MCP messages and requests. Enhanced with support for:
+    - External link classification in ExtractLinksResponse
+    - Comprehensive tool parameter and response interfaces
+    - Enhanced error handling types
+
+- **crawler.ts**
+  : TypeScript types for crawler-related interfaces and configurations.
+
+- **modelcontextprotocol.d.ts**
   : MCP SDK TypeScript declarations.
-- module.d.ts
+
+- **module.d.ts**
   : Module declarations for external libraries.
 
 ## Architectural Patterns
+
+### Tool-Based Architecture
+
+The service layer has been refactored to follow a tool-based architecture pattern where:
+
+1. **Self-Contained Tools**: Each tool extends the `BaseTool` abstract class and includes its own browser management and crawling logic
+2. **Independent Operation**: Tools operate without shared service dependencies for improved reliability and scalability  
+3. **Common Interface**: All tools implement a standardized `execute()` method through the base class
+4. **Isolated Browser Management**: Each tool manages its own Puppeteer browser instance to prevent conflicts
+5. **Specialized Functionality**: Tools are focused on specific use cases (crawling, link extraction, search, etc.)
 
 ### Unified Server Architecture
 
@@ -164,6 +229,7 @@ The server architecture has been refactored to follow a unified approach where:
 1. All configuration is centralized in the `config` directory
 2. The Express and MCP servers are integrated in a single `Server` class
 3. Routes are organized in separate modules for better maintainability
+4. Controllers orchestrate tool execution without service layer dependencies
 
 ### Routing Structure
 
