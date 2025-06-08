@@ -42,7 +42,10 @@ This server achieves **100% compliance** with the official Model Context Protoco
 - **Development-Friendly**: Relaxed rate limiting (1 min window, 1000 requests) for testing environment
 - **Enhanced Debugging**: Detailed request/response logging in Streamable HTTP handler
 - **HTTP Transport Improvements**: Proper JSON response termination and enhanced error handling
-- **Tool Definitions**: Dedicated schemas for `crawl` and `crawlWithMarkdown` tools with improved parameter validation
+- **Tool Definitions**: Dedicated schemas for `crawl` and `smartCrawl` tools with improved parameter validation
+- **Architecture Refactor**: Simplified tool-based architecture removing centralized service dependencies
+- **Self-Contained Tools**: Each tool now includes its own browser management and crawler implementation
+- **Enhanced Tool Suite**: Added specialized tools for link extraction, sitemap generation, page search, web search, and date/time utilities
 
 ### 🧪 Testing
 Run MCP compliance tests: `npm run test:mcp-compliance`
@@ -92,10 +95,19 @@ Folder Structure
         ├── routes/             # Route definitions
         │   ├── apiRoutes.ts    # General API endpoints
         │   ├── mcpRoutes.ts    # MCP-specific endpoints (SSE)
-        │   └── mcpStreamableRoutes.ts # MCP endpoints with Streamable HTTP
-        ├── server/             # Unified server implementation
-        │   └── server.ts       # Express and MCP server integration        ├── services/           # Business logic services
-        │   └── crawlExecutionService.ts  # Web crawling service
+        │   └── mcpStreamableRoutes.ts # MCP endpoints with Streamable HTTP        ├── server/             # Unified server implementation
+        │   └── server.ts       # Express and MCP server integration
+        ├── services/           # Business logic services
+        │   └── tools/          # Self-contained tool implementations
+        │       ├── BaseTool.ts     # Abstract base class for all tools
+        │       ├── CrawlTool.ts    # Basic web crawling tool
+        │       ├── DateTimeTool.ts # Date/time utility tool
+        │       ├── ExtractLinksTool.ts # Link extraction tool
+        │       ├── SearchInPageTool.ts # Page content search tool
+        │       ├── SitemapTool.ts  # Sitemap generation tool
+        │       ├── SmartCrawlTool.ts # Intelligent markdown crawling
+        │       ├── WebSearchTool.ts # Web search functionality
+        │       └── index.ts    # Tool module exports
         ├── types/              # TypeScript type definitions
         │   ├── mcp.ts          # MCP type definitions
         │   ├── modelcontextprotocol.d.ts # MCP SDK type declarations
@@ -190,7 +202,7 @@ curl -X POST http://localhost:${PORT:-3000}/mcp \
     }'
 ```
 
-### Use Tool (crawlWithMarkdown)
+### Use Tool (smartCrawl)
 ```bash
 curl -X POST http://localhost:${PORT:-3000}/mcp \
   -H "Content-Type: application/json" \
@@ -198,7 +210,7 @@ curl -X POST http://localhost:${PORT:-3000}/mcp \
       "jsonrpc": "2.0",
       "method": "mcp.tool.use",
       "params": {
-        "name": "crawlWithMarkdown",
+        "name": "smartCrawl",
         "parameters": { 
           "url": "https://example.com", 
           "query": "What is this site about?",
@@ -208,6 +220,93 @@ curl -X POST http://localhost:${PORT:-3000}/mcp \
         }
       },
       "id": 3
+    }'
+```
+
+### Use Tool (extractLinks)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "extractLinks",
+        "parameters": { 
+          "url": "https://example.com"
+        }
+      },
+      "id": 4
+    }'
+```
+
+### Use Tool (sitemapGenerator)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "sitemapGenerator",
+        "parameters": { 
+          "url": "https://example.com",
+          "maxPages": 10,
+          "depth": 2
+        }
+      },
+      "id": 5
+    }'
+```
+
+### Use Tool (searchInPage)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "searchInPage",
+        "parameters": { 
+          "url": "https://example.com",
+          "searchTerm": "contact information"
+        }
+      },
+      "id": 6
+    }'
+```
+
+### Use Tool (webSearch)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "webSearch",
+        "parameters": { 
+          "query": "MCP protocol specification",
+          "maxResults": 5
+        }
+      },
+      "id": 7
+    }'
+```
+
+### Use Tool (dateTime)
+```bash
+curl -X POST http://localhost:${PORT:-3000}/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "dateTime",
+        "parameters": {}
+      },
+      "id": 8
     }'
 ```
 
@@ -239,6 +338,25 @@ curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
         "parameters": { "url": "https://example.com", "maxPages": 1 }
       },
       "id": 2
+    }'
+```
+
+### Use Tool (smartCrawl)
+```bash
+curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
+  -H "Content-Type: application/json" \
+  -d '{
+      "jsonrpc": "2.0",
+      "method": "mcp.tool.use",
+      "params": {
+        "name": "smartCrawl",
+        "parameters": { 
+          "url": "https://example.com", 
+          "query": "What is this site about?",
+          "maxPages": 1 
+        }
+      },
+      "id": 3
     }'
 ```
 
@@ -282,11 +400,46 @@ Response:
       "endpoint": "/api/tools/crawl"
     },
     {
-      "name": "crawlWithMarkdown", 
+      "name": "smartCrawl", 
       "description": "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
       "parameterDescription": "URL to crawl, optional crawling parameters, and an optional query.",
       "returnDescription": "Object containing success status, original URL, markdown content, and optional error message.",
-      "endpoint": "/api/tools/crawlWithMarkdown"
+      "endpoint": "/api/tools/smartCrawl"
+    },
+    {
+      "name": "extractLinks",
+      "description": "Extract and categorize links from a web page.",
+      "parameterDescription": "URL to extract links from.",
+      "returnDescription": "Object containing internal and external links with their descriptions.",
+      "endpoint": "/api/tools/extractLinks"
+    },
+    {
+      "name": "sitemapGenerator",
+      "description": "Generate a sitemap from a website by crawling its pages.",
+      "parameterDescription": "URL to crawl for sitemap generation with optional depth and maxPages.",
+      "returnDescription": "Object containing the generated sitemap structure.",
+      "endpoint": "/api/tools/sitemapGenerator"
+    },
+    {
+      "name": "searchInPage",
+      "description": "Search for specific content within a web page.",
+      "parameterDescription": "URL and search term to look for.",
+      "returnDescription": "Object containing search results and matches.",
+      "endpoint": "/api/tools/searchInPage"
+    },
+    {
+      "name": "webSearch",
+      "description": "Perform web search and extract results.",
+      "parameterDescription": "Search query and maximum number of results.",
+      "returnDescription": "Object containing search results with titles, descriptions, and URLs.",
+      "endpoint": "/api/tools/webSearch"
+    },
+    {
+      "name": "dateTime",
+      "description": "Get current date and time information in various formats.",
+      "parameterDescription": "Optional timezone parameter.",
+      "returnDescription": "Object containing current date/time in multiple formats.",
+      "endpoint": "/api/tools/dateTime"
     }
   ]
 }
@@ -309,15 +462,64 @@ curl -X POST http://localhost:${PORT:-3000}/api/tools/crawl \
   }'
 ```
 
-#### Crawl with Markdown Tool
+#### Smart Crawl Tool (Markdown Output)
 ```bash
-curl -X POST http://localhost:${PORT:-3000}/api/tools/crawlWithMarkdown \
+curl -X POST http://localhost:${PORT:-3000}/api/tools/smartCrawl \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com",
     "query": "What is this site about?",
     "maxPages": 2,
     "depth": 1
+  }'
+```
+
+#### Extract Links Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/extractLinks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com"
+  }'
+```
+
+#### Sitemap Generator Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/sitemapGenerator \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "maxPages": 10,
+    "depth": 2
+  }'
+```
+
+#### Search In Page Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/searchInPage \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "searchTerm": "contact information"
+  }'
+```
+
+#### Web Search Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/webSearch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "MCP protocol specification",
+    "maxResults": 5
+  }'
+```
+
+#### Date Time Tool
+```bash
+curl -X POST http://localhost:${PORT:-3000}/api/tools/dateTime \
+  -H "Content-Type: application/json" \
+  -d '{
+    "timezone": "UTC"
   }'
 ```
 
@@ -353,24 +555,78 @@ Key Components
 - **Routes**: Organized in separate files for API and MCP endpoints.
 - **SimpleMcpServer**: Implements MCP discovery and tool invocation logic.
 - **Controllers**: `toolController` and `resourceController` for handling business logic.
+- **Tools**: Self-contained tool implementations extending the BaseTool abstract class:
+  - **CrawlTool**: Basic web crawling with content extraction
+  - **SmartCrawlTool**: Intelligent crawling with markdown output and query support
+  - **ExtractLinksTool**: Extract and categorize links from web pages
+  - **SitemapTool**: Generate sitemaps from crawled content
+  - **SearchInPageTool**: Search for specific content within web pages
+  - **WebSearchTool**: Web search functionality with result extraction
+  - **DateTimeTool**: Date and time utility functions
 - **Configuration**: Centralized configuration system with module-specific settings.
 - **MCP Transport**: Supports both modern Streamable HTTP and legacy SSE transport methods.
-- **Web Crawling**: Advanced Puppeteer-based crawler with error handling, multiple strategies, and content extraction capabilities.
+- **Tool Architecture**: Each tool includes its own browser management, crawling logic, and error handling for complete self-containment.
 
 ## Web Crawling Features
 
-The MCP server includes a comprehensive web crawling service with the following features:
+The MCP server includes a comprehensive set of self-contained crawling tools, each with integrated browser management and specialized functionality:
 
-### Browser Management
+### Tool-Based Architecture
+- **Self-Contained Design**: Each tool manages its own Puppeteer browser instance and crawling logic
+- **BaseTool Abstract Class**: Common functionality shared across all tools with standardized error handling
+- **Independent Operation**: Tools operate without shared service dependencies for improved reliability
+
+### Available Tools
+
+#### CrawlTool
+- **Basic Web Crawling**: Extract text content and tables from web pages
+- **Multiple Strategies**: BFS, DFS, and best-first crawling approaches
+- **Screenshot Capture**: Optional full-page screenshot functionality
+- **Content Extraction**: Intelligent visible text extraction skipping hidden elements
+
+#### SmartCrawlTool  
+- **Markdown Output**: HTML to Markdown conversion with custom formatting rules
+- **Query-Based Crawling**: Focused content extraction based on specific queries
+- **Smart Content Detection**: Enhanced relevance scoring for different content types
+- **Structured Output**: Well-formatted markdown with proper headings and sections
+
+#### ExtractLinksTool
+- **Link Categorization**: Separate internal and external link extraction
+- **Link Analysis**: Extract link text, URLs, and descriptions
+- **Comprehensive Coverage**: Find all clickable links within page content
+
+#### SitemapTool
+- **Sitemap Generation**: Create structured sitemaps from crawled content
+- **Hierarchical Structure**: Organize pages by depth and relationship
+- **Configurable Depth**: Control crawling depth for sitemap generation
+
+#### SearchInPageTool
+- **Content Search**: Find specific terms or phrases within web pages
+- **Context Extraction**: Provide surrounding context for search matches
+- **Relevance Scoring**: Rank search results by relevance
+
+#### WebSearchTool
+- **Web Search Integration**: Perform web searches and extract results
+- **Result Processing**: Extract titles, descriptions, and URLs from search results
+- **Configurable Results**: Control number of results returned
+
+#### DateTimeTool
+- **Time Utilities**: Current date/time in multiple formats
+- **Timezone Support**: Convert times across different timezones
+- **Formatting Options**: Various date/time format outputs
+
+### Shared Browser Management Features
 - **Robust Error Handling**: Improved browser initialization with proper error handling and fallback mechanisms
 - **Custom Chrome Path**: Support for custom Chrome/Chromium executable paths via `PUPPETEER_EXECUTABLE_PATH`
-- **Resource Management**: Automatic browser cleanup and connection management
+- **Resource Management**: Automatic browser cleanup and connection management in each tool
+- **Independent Instances**: Each tool manages its own browser instance for better isolation
 
-### Content Extraction
+### Content Extraction (Across Tools)
 - **Text Extraction**: Intelligent visible text extraction that skips hidden elements and scripts
 - **Markdown Conversion**: HTML to Markdown conversion with custom rules for tables and code blocks
 - **Table Extraction**: Structured extraction of HTML tables with caption support
 - **Screenshot Capture**: Optional full-page screenshot functionality
+- **Link Processing**: Extract and categorize internal vs external links
 
 ### Crawling Strategies
 - **Breadth-First Search (BFS)**: Default strategy for systematic exploration
@@ -393,6 +649,8 @@ Customization
 -------------
 - Add new routes in the `routes` directory.
 - Extend MCP capabilities by modifying `SimpleMcpServer` or adding new controllers.
+- Create new tools by extending the `BaseTool` abstract class in the `services/tools` directory.
+- Each tool is self-contained and can be developed independently.
 - Tune performance and security via environment variables in the `config` directory.
 
 ## Architecture Diagram
@@ -404,7 +662,14 @@ graph LR
   Router --> |Streamable HTTP| SimpleMcpServer
   Router --> ApiControllers
   SimpleMcpServer --> Controllers
-  Controllers --> CrawlExecutionService
+  Controllers --> Tools["Self-Contained Tools"]
+  Tools --> |BaseTool| CrawlTool
+  Tools --> |BaseTool| SmartCrawlTool
+  Tools --> |BaseTool| ExtractLinksTool
+  Tools --> |BaseTool| SitemapTool
+  Tools --> |BaseTool| SearchInPageTool
+  Tools --> |BaseTool| WebSearchTool
+  Tools --> |BaseTool| DateTimeTool
 ```
 
 ## References

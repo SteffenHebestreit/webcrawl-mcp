@@ -8,7 +8,6 @@ import config from '../config';
 import { SimpleMcpServer } from '../mcp/SimpleMcpServer';
 import { ResourceController } from '../controllers/resourceController';
 import { ToolController } from '../controllers/toolController';
-import { CrawlExecutionService } from '../services/crawlExecutionService';
 import { setupMcpRoutes } from '../routes/mcpRoutes';
 import { setupMcpStreamableRoutes } from '../routes/mcpStreamableRoutes';
 import { setupApiRoutes } from '../routes/apiRoutes';
@@ -25,16 +24,14 @@ export class Server {
   private mcpServer: SimpleMcpServer;
   private resourceController: ResourceController;
   private toolController: ToolController;
-  private crawlExecutor: CrawlExecutionService;
   private logger = createLogger('Server');
 
   constructor() {
     this.app = express();
 
     // Instantiate services and controllers
-    this.crawlExecutor = new CrawlExecutionService();
     this.resourceController = new ResourceController(config);
-    this.toolController = new ToolController(config, this.crawlExecutor);
+    this.toolController = new ToolController(config);
 
     // Instantiate the MCP server
     this.mcpServer = new SimpleMcpServer(config);    // Register tools with the MCP server instance    this.mcpServer.tool(this.toolController.getCrawlToolConfig());
