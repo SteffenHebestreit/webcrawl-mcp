@@ -1,4 +1,4 @@
-# 🏆 MCP-Server-Template - REFERENCE IMPLEMENTATION 🏆
+# 🏆 Webcrawl MCP Server - Production Ready Implementation 🏆
 
 ```
 ███╗   ███╗ ██████╗██████╗     ██████╗ ███████╗███████╗
@@ -8,126 +8,124 @@
 ██║ ╚═╝ ██║╚██████╗██║         ██║  ██║███████╗██║     
 ╚═╝     ╚═╝ ╚═════╝╚═╝         ╚═╝  ╚═╝╚══════╝╚═╝     
      
-   100% COMPLIANT IMPLEMENTATION ✅
+   100% MCP COMPLIANT | ABORT CAPABLE ✅
 ```
 
-This repository implements a **reference-grade** Model Context Protocol (MCP) server for web crawling capabilities, exposing crawlers as tools for any MCP-compliant client. It achieves **100% compliance** with the official MCP specification version 2024-11-05.
+A **production-ready** Model Context Protocol (MCP) server providing comprehensive web crawling capabilities. Features intelligent content extraction, tool execution abort functionality, and full MCP specification compliance.
 
-## 🎯 MCP Compliance Status: 100% COMPLIANT ✅
+## 🎯 Key Features
 
-This server achieves **100% compliance** with the official Model Context Protocol specification:
+- **✅ 100% MCP Compliant** - Full compliance with MCP specification v2024-11-05
+- **🛑 Abort Functionality** - Cancel long-running operations gracefully  
+- **🧠 Smart Crawling** - Intelligent content extraction with relevance scoring
+- **🔗 Link Analysis** - Advanced link extraction and categorization
+- **🗺️ Sitemap Generation** - Comprehensive website structure mapping
+- **🔍 Content Search** - In-page content search and analysis
+- **🌐 Web Search** - Integrated web search capabilities
+- **⏰ Utility Tools** - Date/time and general utility functions
 
-### ✅ Core MCP Features Implemented
-- **Session Management**: Complete session lifecycle with `Mcp-Session-Id` headers
-- **Protocol Initialization**: Proper `initialize` and `notifications/initialized` handshake
-- **Capability Negotiation**: Full support for protocol version negotiation (2024-11-05, 2025-03-26)
-- **Transport Interfaces**: Callbacks for `onclose`, `onerror`, `onmessage`
-- **Standard Error Codes**: All JSON-RPC 2.0 error codes (-32700, -32600, -32601, -32602, -32603)
+## � Quick Start
 
-### 🚀 Transport Protocols
-- **Modern Streamable HTTP**: `/mcp` endpoint with GET info endpoint and enhanced POST handling
-- **Official SSE Pattern**: Separate GET `/mcp/sse` (connection) + POST `/mcp/messages` (data)
-- **Legacy SSE Support**: Backward compatible POST `/mcp/sse` endpoint
-
-### 🛠️ Method Support
-- **Modern Methods**: `tools/list`, `tools/call`, `resources/list`, `resources/read`
-- **Legacy Methods**: `mcp.capabilities`, `mcp.tool.use`, `mcp.resource.list`, `mcp.resource.get`
-- **Initialization**: `initialize`, `notifications/initialized`
-
-### 🎯 Enhanced Features (June 2025)
-- **Content Extraction**: Improved crawling of lottery and jackpot sites with specialized detection
-- **Smart Relevance Scoring**: Adaptive thresholds for different content types
-- **Markdown Generation**: Better formatting with proper headings and section detection
-- **JSON Schema Support**: Created `schemaConverter.ts` utility for converting Joi schemas to JSON Schema format
-- **Development-Friendly**: Relaxed rate limiting (1 min window, 1000 requests) for testing environment
-- **Enhanced Debugging**: Detailed request/response logging in Streamable HTTP handler
-- **HTTP Transport Improvements**: Proper JSON response termination and enhanced error handling
-- **Tool Definitions**: Dedicated schemas for `crawl` and `smartCrawl` tools with improved parameter validation
-- **Architecture Refactor**: Simplified tool-based architecture removing centralized service dependencies
-- **Self-Contained Tools**: Each tool now includes its own browser management and crawler implementation
-- **Enhanced Tool Suite**: Added specialized tools for link extraction, sitemap generation, page search, web search, and date/time utilities
-
-### 🧪 Testing
-Run MCP compliance tests: `npm run test:mcp-compliance`
-
-Documentation
--------------
-- **[OVERVIEW.md](OVERVIEW.md)**: High-level architecture and conceptual overview.
-- **[CODE_STRUCTURE.md](CODE_STRUCTURE.md)**: Detailed explanation of each source file and its purpose.
-- **[MCP_API.md](MCP_API.md)**: Detailed API endpoint specifications, JSON-RPC methods, request/response schemas, examples, and sequence diagrams.
-
-Folder Structure
-----------------
-```
-.
-├── .env                        # Environment variables configuration file
-├── .env-template               # Template for environment variables
-├── .github/                    # GitHub-specific files (workflows, templates)
-├── .gitignore                  # Git ignore configuration
-├── CODE_STRUCTURE.md           # Detailed code structure documentation
-├── CONTRIBUTING.md             # Contribution guidelines
-├── LICENSE.md                  # MIT License file
-├── MCP_API.md                  # API specifications document
-├── OVERVIEW.md                 # System overview document
-├── README.md                   # Project overview and quick start (this file)
-├── docker-compose.yml          # Defines multi-container environment
-├── package.json                # Root package with workspace configuration
-│
-└── mcp-service/                # MCP server implementation
-    ├── Dockerfile              # Docker configuration for MCP server
-    ├── package.json            # Package configuration
-    ├── tsconfig.json           # TypeScript configuration
-    ├── tsconfig.node.json      # TypeScript Node.js-specific configuration
-    └── src/
-        ├── index.ts            # Entry point for MCP server
-        ├── config/             # Centralized configuration
-        │   ├── index.ts        # Main configuration entry point
-        │   ├── appConfig.ts    # Application settings
-        │   ├── mcpConfig.ts    # MCP-specific settings
-        │   ├── securityConfig.ts # Security-related settings
-        │   ├── crawlConfig.ts  # Web crawling settings
-        │   └── utils.ts        # Configuration utility functions
-        ├── controllers/        # API endpoint controllers
-        │   ├── resourceController.ts
-        │   └── toolController.ts
-        ├── mcp/                # MCP protocol implementation
-        │   └── SimpleMcpServer.ts
-        ├── routes/             # Route definitions
-        │   ├── apiRoutes.ts    # General API endpoints
-        │   ├── mcpRoutes.ts    # MCP-specific endpoints (SSE)
-        │   └── mcpStreamableRoutes.ts # MCP endpoints with Streamable HTTP        ├── server/             # Unified server implementation
-        │   └── server.ts       # Express and MCP server integration
-        ├── services/           # Business logic services
-        │   └── tools/          # Self-contained tool implementations
-        │       ├── BaseTool.ts     # Abstract base class for all tools
-        │       ├── CrawlTool.ts    # Basic web crawling tool
-        │       ├── DateTimeTool.ts # Date/time utility tool
-        │       ├── ExtractLinksTool.ts # Link extraction tool
-        │       ├── SearchInPageTool.ts # Page content search tool
-        │       ├── SitemapTool.ts  # Sitemap generation tool
-        │       ├── SmartCrawlTool.ts # Intelligent markdown crawling
-        │       ├── WebSearchTool.ts # Web search functionality
-        │       └── index.ts    # Tool module exports
-        ├── types/              # TypeScript type definitions
-        │   ├── mcp.ts          # MCP type definitions
-        │   ├── modelcontextprotocol.d.ts # MCP SDK type declarations
-        │   └── module.d.ts     # Module declarations for external libraries
-        ├── utils/              # Utility functions
-        │   ├── logger.ts       # Logging utilities
-        │   ├── requestLogger.ts # HTTP request logging middleware
-        │   └── schemaConverter.ts # Joi to JSON Schema conversion utilities
-        └── test/               # Test files
-            ├── mcp-compliance-test.ts # Comprehensive MCP compliance tests
-            └── mcp-compliance-test-simple.ts # Simple MCP tests
-```
-
-Quick Start
------------
-
-### Using Docker
-
-```
+### Using Docker (Recommended)
+```bash
 docker-compose up --build
+```
+
+### Local Development
+```bash
+# Install dependencies
+npm install
+cd mcp-service && npm install
+
+# Start development server
+npm run dev
+```
+
+## 🛠️ Available Tools
+
+| Tool | Description | Key Features |
+|------|-------------|--------------|
+| **crawl** | Basic web crawling | Page content, metadata, links |
+| **smartCrawl** | Intelligent crawling | Relevance scoring, smart navigation |
+| **extractLinks** | Link extraction | Categorization, filtering, analysis |
+| **searchInPage** | Content search | Text matching, context extraction |
+| **generateSitemap** | Sitemap creation | Site structure, hierarchy mapping |
+| **webSearch** | Web search | Multi-engine support, result filtering |
+| **getDateTime** | Date/time utilities | Timezone support, formatting |
+
+## 🛑 Abort Functionality
+
+All tools support graceful cancellation:
+
+```bash
+# Start a tool execution
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"crawl","arguments":{"url":"https://example.com"}},"id":"tool-123"}'
+
+# Abort the execution
+curl -X POST http://localhost:3000/tools/abort/tool-123
+```
+
+## 📋 MCP Protocol Support
+
+- **✅ Session Management**: Complete session lifecycle with `Mcp-Session-Id` headers
+- **✅ Protocol Initialization**: Proper `initialize` and `notifications/initialized` handshake  
+- **✅ Capability Negotiation**: Full support for protocol version negotiation
+- **✅ Transport Protocols**: Modern Streamable HTTP and SSE support
+- **✅ Standard Methods**: `tools/list`, `tools/call`, `resources/list`, `resources/read`
+- **✅ Error Handling**: All JSON-RPC 2.0 error codes properly implemented
+
+## 🏗️ Architecture
+
+```
+mcp-service/
+├── src/
+│   ├── services/tools/         # Self-contained tool implementations
+│   │   ├── BaseTool.ts         # Base class with abort functionality
+│   │   ├── CrawlTool.ts        # Web crawling
+│   │   ├── SmartCrawlTool.ts   # Intelligent crawling
+│   │   ├── ExtractLinksTool.ts # Link extraction
+│   │   ├── SearchInPageTool.ts # Page search
+│   │   ├── SitemapTool.ts      # Sitemap generation
+│   │   ├── WebSearchTool.ts    # Web search
+│   │   └── DateTimeTool.ts     # Date/time utilities
+│   ├── mcp/                    # MCP protocol implementation
+│   ├── routes/                 # HTTP endpoints
+│   ├── controllers/            # Request handlers
+│   └── config/                 # Configuration management
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# Copy template and configure
+cp .env-template .env
+
+# Key settings
+PORT=3000                       # Server port
+MCP_TRANSPORT=streamable-http   # Transport protocol
+PUPPETEER_HEADLESS=true        # Browser mode
+LOG_LEVEL=info                 # Logging level
+```
+
+### Development vs Production
+- **Development**: Relaxed rate limiting (1000 requests/minute)
+- **Production**: Secure defaults with stricter limits
+
+## 🧪 Testing
+
+```bash
+# Run MCP compliance tests
+npm run test:mcp-compliance
+
+# Run all tests
+npm test
+
+# Build project
+npm run build
+```
 ```
 
 ### Running Locally
@@ -149,257 +147,100 @@ docker-compose up --build
    
    # Or for development with auto-reload:
    npm run dev
-   ```
+   ## 🌐 API Endpoints
 
-# API Endpoints
+| Endpoint | Protocol | Description |
+|----------|----------|-------------|
+| `POST /mcp` | MCP Streamable HTTP | **Recommended** - Modern JSON-RPC over HTTP |
+| `GET /mcp` | HTTP | Server info and connection details |
+| `POST /tools/abort/:toolId` | REST | Abort tool execution |
+| `GET /api/health` | REST | Health check |
+| `GET /api/version` | REST | Version information |
 
-The server provides multiple endpoints:
+## 📝 Usage Examples
 
-- **MCP Streamable HTTP** (Recommended): `/mcp` - Modern JSON-RPC over HTTP with streaming support
-- **MCP SSE** (Deprecated): `/mcp/sse` - Legacy Server-Sent Events endpoint
-- **API Endpoints**: `/api/health`, `/api/version` - General server information
-
-See detailed API documentation in [MCP_API.md](MCP_API.md).
-
-# Testing Endpoints
-
-## MCP Streamable HTTP Endpoint (Recommended)
-
-The modern approach recommended by the MCP specification.
-
-### Capabilities Request
+### Basic Tool Execution
 ```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
+# Execute crawl tool
+curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
   -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.capabilities",
-      "params": {},
-      "id": 1
-    }'
-```
-
-### Use Tool (crawl)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "crawl",
-        "parameters": { 
-          "url": "https://example.com", 
-          "maxPages": 3,
-          "depth": 1,
-          "strategy": "bfs",
-          "captureScreenshots": true,
-          "captureNetworkTraffic": false,
-          "waitTime": 2000
-        }
-      },
-      "id": 2
-    }'
-```
-
-### Use Tool (smartCrawl)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "smartCrawl",
-        "parameters": { 
-          "url": "https://example.com", 
-          "query": "What is this site about?",
-          "maxPages": 2,
-          "depth": 1,
-          "waitTime": 1500
-        }
-      },
-      "id": 3
-    }'
-```
-
-### Use Tool (extractLinks)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "extractLinks",
-        "parameters": { 
-          "url": "https://example.com"
-        }
-      },
-      "id": 4
-    }'
-```
-
-### Use Tool (sitemapGenerator)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "sitemapGenerator",
-        "parameters": { 
-          "url": "https://example.com",
-          "maxPages": 10,
-          "depth": 2
-        }
-      },
-      "id": 5
-    }'
-```
-
-### Use Tool (searchInPage)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "searchInPage",
-        "parameters": { 
-          "url": "https://example.com",
-          "searchTerm": "contact information"
-        }
-      },
-      "id": 6
-    }'
-```
-
-### Use Tool (webSearch)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "webSearch",
-        "parameters": { 
-          "query": "MCP protocol specification",
-          "maxResults": 5
-        }
-      },
-      "id": 7
-    }'
-```
-
-### Use Tool (dateTime)
-```bash
-curl -X POST http://localhost:${PORT:-3000}/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "dateTime",
-        "parameters": {}
-      },
-      "id": 8
-    }'
-```
-
-## MCP SSE Endpoint (Deprecated)
-
-The legacy approach that uses Server-Sent Events (SSE).
-
-### Capabilities Request
-```bash
-curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.capabilities",
-      "params": {},
-      "id": 1
-    }'
-```
-
-### Use Tool (crawl)
-```bash
-curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "crawl",
-        "parameters": { "url": "https://example.com", "maxPages": 1 }
-      },
-      "id": 2
-    }'
-```
-
-### Use Tool (smartCrawl)
-```bash
-curl -N -X POST http://localhost:${PORT:-3000}/mcp/sse \
-  -H "Content-Type: application/json" \
-  -d '{
-      "jsonrpc": "2.0",
-      "method": "mcp.tool.use",
-      "params": {
-        "name": "smartCrawl",
-        "parameters": { 
-          "url": "https://example.com", 
-          "query": "What is this site about?",
-          "maxPages": 1 
-        }
-      },
-      "id": 3
-    }'
-```
-
-## API Endpoints
-
-### Health Check
-```bash
-curl http://localhost:${PORT:-3000}/api/health
-```
-
-Response:
-```
-OK
-```
-
-### Version Info
-```bash
-curl http://localhost:${PORT:-3000}/api/version
-```
-
-Response:
-```json
-{"name":"webcrawl-mcp","version":"1.0.0","description":"MCP Server for scrape websites"}
-```
-
-### List Available Tools
-```bash
-curl http://localhost:${PORT:-3000}/api/tools
-```
-
-Response:
-```json
-{
-  "success": true,
-  "tools": [
-    {
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
       "name": "crawl",
-      "description": "Crawl a website and extract text content and tables.",
-      "parameterDescription": "URL to crawl along with optional crawling parameters like maxPages, depth, strategy, etc.",
-      "returnDescription": "Object containing success status, original URL, extracted text content, optional tables, and optional error message.",
-      "endpoint": "/api/tools/crawl"
+      "arguments": {
+        "url": "https://example.com",
+        "maxPages": 3
+      }
     },
-    {
+    "id": 1
+  }'
+```
+
+### Smart Crawl with Query
+```bash
+# Execute smart crawl with relevance scoring
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "smartCrawl",
+      "arguments": {
+        "url": "https://example.com",
+        "query": "pricing information",
+        "maxPages": 5,
+        "relevanceThreshold": 3
+      }
+    },
+    "id": 2
+  }'
+```
+
+### Tool Execution with Abort
+```bash
+# Start tool execution
+TOOL_ID=$(curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"generateSitemap","arguments":{"url":"https://large-site.com","maxPages":100}},"id":"sitemap-1"}' \
+  | jq -r '.result.toolId')
+
+# Abort if needed
+curl -X POST http://localhost:3000/tools/abort/$TOOL_ID
+```
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[MCP_API.md](MCP_API.md)** | Complete API reference and examples |
+| **[TOOL_ABORT.md](TOOL_ABORT.md)** | Tool abort functionality guide |
+| **[OVERVIEW.md](OVERVIEW.md)** | Architecture and design overview |
+| **[CODE_STRUCTURE.md](CODE_STRUCTURE.md)** | Developer documentation |
+| **[CONTRIBUTING.md](CONTRIBUTING.md)** | Contribution guidelines |
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📄 License
+
+This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0). This means you are free to:
+
+- **Share** — copy and redistribute the material in any medium or format
+- **Adapt** — remix, transform, and build upon the material
+
+Under the following terms:
+- **Attribution** — You must give appropriate credit
+- **NonCommercial** — You may not use the material for commercial purposes
+
+See the [LICENSE.md](LICENSE.md) file for the complete license text.
+
+---
+
+**Made with ❤️ for the MCP community**
       "name": "smartCrawl", 
       "description": "Crawl a website and return markdown-formatted content, potentially answering a specific query.",
       "parameterDescription": "URL to crawl, optional crawling parameters, and an optional query.",
@@ -679,7 +520,3 @@ graph LR
 - [MCP API Reference](MCP_API.md): Endpoint specs and JSON-RPC methods.
 - [Model Context Protocol SDK](https://www.npmjs.com/package/@modelcontextprotocol/sdk): Official SDK documentation.
 - [MCP Transport Models](https://github.com/modelcontextprotocol/typescript-sdk#transport): Details on SSE vs Streamable HTTP.
-
-## License
-
-This project is licensed under the MIT License (see the `license` field in `package.json`).
