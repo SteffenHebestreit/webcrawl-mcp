@@ -37,13 +37,28 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
 
   /**
    * Execute crawl operation
-   */  public async execute(params: CrawlParams): Promise<CrawlResponse> {
+   */  
+  public async execute(params: CrawlParams): Promise<CrawlResponse> {
     this.logger.info('Executing crawl with params:', params);
     
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
     const startTime = Date.now();
     
     try {
-      const crawlResult = await this.executeCrawl(params.url, params);
+      const crawlResult = await this.executeCrawl(params.url, params, signal);
+
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Crawl operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          text: '',
+          error: 'Operation aborted by user'
+        };
+      }
 
       if (!crawlResult.success) {
         return {
@@ -71,6 +86,18 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
         processingTime: Date.now() - startTime
       };
     } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError') {
+        this.logger.info('Crawl operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          text: '',
+          error: 'Operation aborted by user'
+        };
+      }
+      
       this.logger.error('Error in CrawlTool execute:', error);
       return {
         success: false,
@@ -79,6 +106,9 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
         text: '',
         error: error.message
       };
+    } finally {
+      // Clear the abort controller reference
+      this.abortController = null;
     }
   }
 
@@ -194,19 +224,62 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
   /**
    * Execute crawl operation
    */
-  private async executeCrawl(url: string, params: CrawlParams): Promise<CrawlResult> {
+  private async executeCrawl(url: string, params: CrawlParams, signal?: AbortSignal): Promise<CrawlResult> {
     this.logger.info(`Starting crawl for: ${url}`);
+    
+    // Check if already aborted before starting
+    if (signal?.aborted) {
+      this.logger.info('Crawl operation aborted before starting');
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    
     const browser = await this.launchBrowser();
     let page: Page | null = null;
 
     try {
+      // Add an abort handler
+      if (signal) {
+        signal.addEventListener('abort', async () => {
+          this.logger.info('Abort signal received during crawl, cleaning up resources');
+          if (page && !page.isClosed()) {
+            await page.close().catch(err => this.logger.error('Error closing page on abort:', err));
+          }
+          if (browser) {
+            await browser.close().catch(err => this.logger.error('Error closing browser on abort:', err));
+          }
+        });
+      }
+      
       page = await this.createStandardPage(browser);
+      
+      // Check if aborted before navigation
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       
       // Navigate to the URL
       await this.navigateWithRetry(page, url);
       
+      // Check if aborted after navigation
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
       // Wait for page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(resolve, 3000);
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        }
+      });
+      
+      // Check if aborted before extraction
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       
       // Extract page data
       const pageData = await page.evaluate(() => {
@@ -277,6 +350,11 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
         };
       });
       
+      // Final abort check
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      
       this.logger.info(`Successfully crawled ${url}`);
       
       return {
@@ -297,6 +375,11 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
       };
       
     } catch (error: any) {
+      // Re-throw AbortError
+      if (error.name === 'AbortError') {
+        throw error;
+      }
+      
       this.logger.error(`Error crawling ${url}:`, error);
       
       return {
@@ -305,12 +388,17 @@ export class CrawlTool extends BaseTool<CrawlParams, CrawlResponse> {
         error: error.message
       };
     } finally {
-      if (page && !page.isClosed()) {
-        await page.close();
-      }
-      if (browser) {
-        await browser.close();
-        this.logger.info(`Browser closed for crawl operation on ${url}`);
+      // Clean up resources if not already closed by abort handler
+      if (signal?.aborted) {
+        this.logger.info('Skipping resource cleanup as abort handler already handled it');
+      } else {
+        if (page && !page.isClosed()) {
+          await page.close().catch(err => this.logger.error('Error closing page:', err));
+        }
+        if (browser) {
+          await browser.close().catch(err => this.logger.error('Error closing browser:', err));
+          this.logger.info(`Browser closed for crawl operation on ${url}`);
+        }
       }
     }
   }

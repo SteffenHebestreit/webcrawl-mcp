@@ -121,5 +121,46 @@ export function setupApiRoutes(): Router {
     }
   });
 
+  // Add tool abort endpoint
+  router.post('/tools/abort/:toolId', async (req: Request, res: Response) => {
+    try {
+      const { toolId } = req.params;
+      logger.info(`Received abort request for tool: ${toolId}`);
+
+      if (!toolId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing tool ID',
+          message: 'Tool ID is required to abort a tool execution'
+        });
+      }
+
+      // Attempt to abort the tool execution
+      const abortResult = toolController.abortToolExecution(toolId);
+      
+      if (abortResult) {
+        logger.info(`Successfully aborted tool execution: ${toolId}`);
+        return res.status(200).json({
+          success: true,
+          message: `Successfully aborted tool execution: ${toolId}`
+        });
+      } else {
+        logger.warn(`Failed to abort tool execution: ${toolId}`);
+        return res.status(404).json({
+          success: false,
+          error: 'Abort failed',
+          message: `No active tool found with ID: ${toolId} or the tool could not be aborted`
+        });
+      }
+    } catch (error: any) {
+      logger.error(`Error aborting tool execution:`, error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error.message
+      });
+    }
+  });
+
   return router;
 }

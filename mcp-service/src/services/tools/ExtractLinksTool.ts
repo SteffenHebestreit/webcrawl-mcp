@@ -32,11 +32,10 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
       this.logger.error('Error creating temporary directory:', error);
       throw error;
     }
-  }
-  /**
+  }  /**
    * Launches a new browser instance for an operation.
    */
-  private async launchBrowser(): Promise<Browser> {
+  private async launchBrowser(signal?: AbortSignal): Promise<Browser> {
     this.logger.info('Launching new browser instance for operation');
     try {
       const launchOptions = {
@@ -145,14 +144,14 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
 
   /**
    * Extract links from a web page
-   */
-  private async extractLinks(
+   */  private async extractLinks(
     url: string,
     includeFragments: boolean = true,
     includeQueryParams: boolean = true,
     categorizeLinks: boolean = true,
     includeExternalLinks: boolean = true,
-    maxLinks: number = 100
+    maxLinks: number = 100,
+    signal?: AbortSignal
   ): Promise<{
     success: boolean;
     url: string;
@@ -167,19 +166,32 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
     }>;
     pageTitle?: string;
     baseUrl: string;
-    error?: string;
+  error?: string;
   }> {
     this.logger.info(`Extracting links from: ${url}`);
-    const browser = await this.launchBrowser();
+    let browser: Browser | null = null;
     let page: Page | null = null;
     
     try {
+      // Check if operation was aborted before starting
+      if (signal?.aborted) {
+        this.logger.info('Extract links operation aborted before browser launch');
+        throw new Error('AbortError');
+      }
+      
+      browser = await this.launchBrowser(signal);
       page = await this.createStandardPage(browser);
       
       // Enable request interception to handle failed requests
       await page.setRequestInterception(true);
       
       page.on('request', (request) => {
+        // Check if operation was aborted before continuing request
+        if (signal?.aborted) {
+          request.abort();
+          return;
+        }
+        
         const resourceType = request.resourceType();
         
         // Skip images and fonts for faster loading and better stability
@@ -199,11 +211,40 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
         this.logger.warn(`Page script error for ${url}:`, error.message);
       });
       
-      // Navigate to URL with enhanced retry logic
-      await this.navigateWithRetry(page, url);
+      // Setup abort signal listener
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          this.logger.info('Extract links operation aborted during execution');
+          if (page) {
+            page.close().catch(err => this.logger.error('Error closing page after abort:', err));
+          }
+        });
+      }
+        // Navigate to URL with enhanced retry logic and abort handling
+      await Promise.race([
+        this.navigateWithRetry(page, url),
+        new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('AbortError'));
+          } else if (signal) {
+            const abortHandler = () => reject(new Error('AbortError'));
+            signal.addEventListener('abort', abortHandler, { once: true });
+          }
+        })
+      ]);
       
-      // Wait for the page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for the page to stabilize with abort handling
+      await Promise.race([
+        new Promise(resolve => setTimeout(resolve, 3000)),
+        new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('AbortError'));
+          } else if (signal) {
+            const abortHandler = () => reject(new Error('AbortError'));
+            signal.addEventListener('abort', abortHandler, { once: true });
+          }
+        })
+      ]);
       
       // Extract links and page metadata
       const extractedData = await page.evaluate((includeFragments, includeQueryParams, categorizeLinks, includeExternalLinks) => {
@@ -401,12 +442,15 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
       }
     }
   }
-
   /**
    * Execute link extraction from a specific page
    */
   public async execute(params: ExtractLinksParams): Promise<ExtractLinksResponse> {
     this.logger.info('Executing extractLinks with params:', params);
+    
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
+    const startTime = Date.now();
     
     try {
       const extractedLinks = await this.extractLinks(
@@ -415,7 +459,25 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
         params.includeQueryParams ?? true,
         params.categorizeLinks ?? true,
         params.includeExternalLinks ?? true,
-        params.maxLinks ?? 100      );
+        params.maxLinks ?? 100,
+        signal
+      );
+      
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Extract links operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          links: [],
+          totalLinks: 0,
+          internalLinks: 0,
+          externalLinks: 0,
+          baseUrl: params.url,
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
 
       if (!extractedLinks.success) {
         return {
@@ -426,7 +488,8 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
           internalLinks: 0,
           externalLinks: 0,
           baseUrl: params.url,
-          error: extractedLinks.error || 'Failed to extract links'
+          error: extractedLinks.error || 'Failed to extract links',
+          processingTime: Date.now() - startTime
         };
       }
 
@@ -466,9 +529,7 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
 
       // Count internal and external links
       const internalLinks = sortedLinks.filter(l => !l.isExternal).length;
-      const externalLinks = sortedLinks.filter(l => l.isExternal).length;
-
-      return {
+      const externalLinks = sortedLinks.filter(l => l.isExternal).length;      return {
         success: true,
         url: params.url,
         links: sortedLinks,
@@ -478,9 +539,26 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
         externalLinks,
         pageTitle: extractedLinks.pageTitle,
         baseUrl: extractedLinks.baseUrl,
-        error: undefined
+        error: undefined,
+        processingTime: Date.now() - startTime
       };
     } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError' || error.message === 'AbortError') {
+        this.logger.info('Extract links operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          links: [],
+          totalLinks: 0,
+          internalLinks: 0,
+          externalLinks: 0,
+          baseUrl: params.url,
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+      
       this.logger.error('Error in ExtractLinksTool executeExtractLinks:', error);
       return {
         success: false,
@@ -490,7 +568,8 @@ export class ExtractLinksTool extends BaseTool<ExtractLinksParams, ExtractLinksR
         internalLinks: 0,
         externalLinks: 0,
         baseUrl: params.url,
-        error: error.message
+        error: error.message,
+        processingTime: Date.now() - startTime
       };
     }
   }
