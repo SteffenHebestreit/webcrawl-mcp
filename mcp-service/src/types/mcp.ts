@@ -174,6 +174,7 @@ export interface SearchInPageResponse {
   summary: string;
   totalMatches: number;
   error?: string;
+  processingTime?: number; // Time in milliseconds taken to process the request
 }
 
 export interface SmartCrawlParams {
@@ -197,6 +198,7 @@ export interface SmartCrawlResponse {
   }>;
   overallSummary: string;
   error?: string;
+  processingTime?: number; // Time in milliseconds taken to process the request
 }
 
 export interface ExtractLinksParams {
@@ -228,6 +230,7 @@ export interface ExtractLinksResponse {
     form: number;
     other: number;
   };
+  processingTime?: number; // Time in milliseconds taken to process the request
   totalLinks: number;
   internalLinks: number; // Count of internal links
   externalLinks: number; // Count of external links
@@ -277,10 +280,10 @@ export interface SitemapGeneratorResponse {
   };
   hierarchy: {
     [url: string]: string[]; // URL -> array of child URLs
-  };
-  baseUrl: string;
+  };  baseUrl: string;
   crawlTimestamp: string;
   error?: string;
+  processingTime?: number; // Time in milliseconds taken to process the request
 }
 
 /**

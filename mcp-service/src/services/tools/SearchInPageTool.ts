@@ -33,28 +33,65 @@ export class SearchInPageTool extends BaseTool<SearchInPageParams, SearchInPageR
       throw error;
     }
   }
-
   /**
    * Execute search in page
    */
   public async execute(params: SearchInPageParams): Promise<SearchInPageResponse> {
     this.logger.info('Executing searchInPage with params:', params);
     
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
+    const startTime = Date.now();
+    
     try {
-      const searchResult = await this.searchInPage(params);      if (!searchResult.success) {
+      const searchResult = await this.searchInPage(params, signal);
+      
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Search in page operation was aborted');
         return {
           success: false,
           url: params.url,
           query: params.query,
           matches: [],
           totalMatches: 0,
-          summary: '',
-          error: searchResult.error || 'Search in page failed'
+          summary: 'Operation aborted by user',
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+      
+      if (!searchResult.success) {
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          matches: [],
+          totalMatches: 0,
+          summary: '',          error: searchResult.error || 'Search in page failed',
+          processingTime: Date.now() - startTime
         };
       }
 
-      return searchResult;    } catch (error: any) {
-      this.logger.error('Error in SearchInPageTool execute:', error);
+      // Add processing time to the result
+      searchResult.processingTime = Date.now() - startTime;
+      return searchResult;
+    } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError' || error.message === 'AbortError') {
+        this.logger.info('Search in page operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          matches: [],
+          totalMatches: 0,
+          summary: 'Operation aborted by user',
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+        this.logger.error('Error in SearchInPageTool execute:', error);
       return {
         success: false,
         url: params.url,
@@ -62,15 +99,15 @@ export class SearchInPageTool extends BaseTool<SearchInPageParams, SearchInPageR
         matches: [],
         totalMatches: 0,
         summary: '',
-        error: error.message
+        error: error.message,
+        processingTime: Date.now() - startTime
       };
     }
   }
-
   /**
    * Launches a new browser instance for an operation.
    */
-  private async launchBrowser(): Promise<Browser> {
+  private async launchBrowser(signal?: AbortSignal): Promise<Browser> {
     this.logger.info('Launching new browser instance for operation');
     try {
       const launchOptions = {
@@ -251,24 +288,49 @@ export class SearchInPageTool extends BaseTool<SearchInPageParams, SearchInPageR
     // Normalize score by snippet length
     return Math.min(score / Math.max(snippet.length / 100, 1), 10);
   }
-
   /**
    * Search within a web page
    */
-  private async searchInPage(params: SearchInPageParams): Promise<SearchInPageResponse> {
+  private async searchInPage(params: SearchInPageParams, signal?: AbortSignal): Promise<SearchInPageResponse> {
     this.logger.info(`Starting search in page: ${params.url} for query: ${params.query}`);
     
-    const browser = await this.launchBrowser();
+    let browser: Browser | null = null;
     let page: Page | null = null;
     
     try {
+      // Check if operation was aborted before starting
+      if (signal?.aborted) {
+        this.logger.info('Search in page operation aborted before browser launch');
+        throw new Error('AbortError');
+      }
+      
+      browser = await this.launchBrowser(signal);
       page = await this.createStandardPage(browser);
+        // Navigate to the URL with abort handling
+      await Promise.race([
+        this.navigateWithRetry(page, params.url),
+        new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('AbortError'));
+          } else if (signal) {
+            const abortHandler = () => reject(new Error('AbortError'));
+            signal.addEventListener('abort', abortHandler, { once: true });
+          }
+        })
+      ]);
       
-      // Navigate to the URL
-      await this.navigateWithRetry(page, params.url);
-      
-      // Wait for page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for page to stabilize with abort handling
+      await Promise.race([
+        new Promise(resolve => setTimeout(resolve, 3000)),
+        new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('AbortError'));
+          } else if (signal) {
+            const abortHandler = () => reject(new Error('AbortError'));
+            signal.addEventListener('abort', abortHandler, { once: true });
+          }
+        })
+      ]);
       
       // Extract page content
       const pageData = await page.evaluate(() => {

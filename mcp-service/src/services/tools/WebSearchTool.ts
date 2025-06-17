@@ -37,10 +37,28 @@ export class WebSearchTool extends BaseTool<WebSearchParams, WebSearchResponse> 
   /**
    * Execute web search
    */
-  public async execute(params: WebSearchParams): Promise<WebSearchResponse> {    this.logger.info('Executing webSearch with params:', params);
+  public async execute(params: WebSearchParams): Promise<WebSearchResponse> {
+    this.logger.info('Executing webSearch with params:', params);
+    
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
     
     try {
-      const searchResult = await this.performWebSearch(params);
+      const searchResult = await this.performWebSearch(params, signal);
+
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Web search operation was aborted');
+        return {
+          success: false,
+          query: params.query,
+          engine: params.engine || 'duckduckgo',
+          results: [],
+          totalResults: 0,
+          searchTimeMs: 0,
+          error: 'Operation aborted by user'
+        };
+      }
 
       if (!searchResult.success) {
         return {
@@ -56,6 +74,20 @@ export class WebSearchTool extends BaseTool<WebSearchParams, WebSearchResponse> 
 
       return searchResult;
     } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError') {
+        this.logger.info('Web search operation was aborted');
+        return {
+          success: false,
+          query: params.query,
+          engine: params.engine || 'duckduckgo',
+          results: [],
+          totalResults: 0,
+          searchTimeMs: 0,
+          error: 'Operation aborted by user'
+        };
+      }
+      
       this.logger.error('Error in WebSearchTool execute:', error);
       return {
         success: false,
@@ -66,6 +98,9 @@ export class WebSearchTool extends BaseTool<WebSearchParams, WebSearchResponse> 
         searchTimeMs: 0,
         error: error.message
       };
+    } finally {
+      // Clear the abort controller reference
+      this.abortController = null;
     }
   }
 
@@ -372,7 +407,7 @@ export class WebSearchTool extends BaseTool<WebSearchParams, WebSearchResponse> 
   /**
    * Perform web search
    */
-  private async performWebSearch(params: WebSearchParams): Promise<WebSearchResponse> {
+  private async performWebSearch(params: WebSearchParams, signal: AbortSignal): Promise<WebSearchResponse> {
     this.logger.info(`Starting web search for: ${params.query} using ${params.engine || 'duckduckgo'}`);
     
     const startTime = Date.now();
