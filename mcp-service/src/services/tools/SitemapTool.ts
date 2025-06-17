@@ -33,17 +33,22 @@ export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGenerat
       throw error;
     }
   }
-
   /**
    * Execute sitemap generation
    */
   public async execute(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
     this.logger.info('Executing sitemap generation with params:', params);
     
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
+    const startTime = Date.now();
+    
     try {
-      const sitemapResult = await this.generateSitemap(params);
-
-      if (!sitemapResult.success) {
+      const sitemapResult = await this.generateSitemap(params, signal);
+      
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Sitemap generation operation was aborted');
         return {
           success: false,
           url: params.url,
@@ -54,17 +59,62 @@ export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGenerat
             errorPages: 0,
             externalLinks: 0,
             maxDepthReached: 0,
-            crawlDuration: 0
+            crawlDuration: Date.now() - startTime
           },
           hierarchy: {},
           baseUrl: params.url,
           crawlTimestamp: new Date().toISOString(),
-          error: sitemapResult.error || 'Sitemap generation failed'
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }      if (!sitemapResult.success) {
+        return {
+          success: false,
+          url: params.url,
+          sitemap: [],
+          statistics: {
+            totalPages: 0,
+            successfulPages: 0,
+            errorPages: 0,
+            externalLinks: 0,
+            maxDepthReached: 0,
+            crawlDuration: Date.now() - startTime
+          },
+          hierarchy: {},
+          baseUrl: params.url,
+          crawlTimestamp: new Date().toISOString(),
+          error: sitemapResult.error || 'Sitemap generation failed',
+          processingTime: Date.now() - startTime
         };
       }
 
+      // Add processing time to the result
+      sitemapResult.processingTime = Date.now() - startTime;
       return sitemapResult;
     } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError' || error.message === 'AbortError') {
+        this.logger.info('Sitemap generation operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          sitemap: [],
+          statistics: {
+            totalPages: 0,
+            successfulPages: 0,
+            errorPages: 0,
+            externalLinks: 0,
+            maxDepthReached: 0,
+            crawlDuration: Date.now() - startTime
+          },
+          hierarchy: {},
+          baseUrl: params.url,
+          crawlTimestamp: new Date().toISOString(),
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+      
       this.logger.error('Error in SitemapTool execute:', error);
       return {
         success: false,
@@ -76,20 +126,20 @@ export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGenerat
           errorPages: 0,
           externalLinks: 0,
           maxDepthReached: 0,
-          crawlDuration: 0
+          crawlDuration: Date.now() - startTime
         },
         hierarchy: {},
         baseUrl: params.url,
         crawlTimestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
+        processingTime: Date.now() - startTime
       };
     }
   }
-
   /**
    * Launches a new browser instance for an operation.
    */
-  private async launchBrowser(): Promise<Browser> {
+  private async launchBrowser(signal?: AbortSignal): Promise<Browser> {
     this.logger.info('Launching new browser instance for operation');
     try {
       const launchOptions = {
@@ -195,11 +245,10 @@ export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGenerat
     
     return navigationSuccessful;
   }
-
   /**
    * Generate sitemap for a website
    */
-  private async generateSitemap(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
+  private async generateSitemap(params: SitemapGeneratorParams, signal?: AbortSignal): Promise<SitemapGeneratorResponse> {
     this.logger.info(`Starting sitemap generation for: ${params.url}`);
     
     const startTime = Date.now();
@@ -224,20 +273,32 @@ export class SitemapTool extends BaseTool<SitemapGeneratorParams, SitemapGenerat
         h2?: string[];
         h3?: string[];
       };
-      error?: string;
-    }> = [];
+      error?: string;    }> = [];
     const hierarchy: { [url: string]: string[] } = {};
     let successfulPages = 0;
     let errorPages = 0;
     let externalLinks = 0;
     let maxDepthReached = 0;
     
-    const browser = await this.launchBrowser();
+    let browser: Browser | null = null;
     
     try {
+      // Check if operation was aborted before starting
+      if (signal?.aborted) {
+        this.logger.info('Sitemap generation operation aborted before browser launch');
+        throw new Error('AbortError');
+      }
+      
+      browser = await this.launchBrowser(signal);
       const baseUrl = new URL(params.url);
       
       while (urlsToVisit.length > 0 && sitemap.length < maxUrls) {
+        // Check if operation was aborted
+        if (signal?.aborted) {
+          this.logger.info('Sitemap generation operation aborted during execution');
+          throw new Error('AbortError');
+        }
+        
         const { url, depth, parentUrl } = urlsToVisit.shift()!;
         
         if (visitedUrls.has(url) || depth > maxDepth) {

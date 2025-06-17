@@ -4,6 +4,7 @@ import { ToolConfig, ResourceConfig } from '../types/mcp';
 import { createLogger } from '../utils/logger';
 import { joiToJsonSchema, getCrawlToolJsonSchema, getCrawlWithMarkdownToolJsonSchema, getWebSearchToolJsonSchema, getDateTimeToolJsonSchema } from '../utils/schemaConverter';
 import * as crypto from 'crypto';
+import { ToolController } from '../controllers/toolController';
 
 interface SessionData {
   sessionId: string;
@@ -31,16 +32,17 @@ interface TransportCallbacks {
  * A simple implementation of Model Context Protocol (MCP) server
  * that supports dynamic registration of tools and resources with full MCP compliance
  */
-export class SimpleMcpServer {
-  private tools: ToolConfig<any, any>[] = [];
+export class SimpleMcpServer {  private tools: ToolConfig<any, any>[] = [];
   private resources: ResourceConfig[] = [];
   private logger = createLogger('SimpleMcpServer');
   private sessions = new Map<string, SessionData>();
   private readonly SUPPORTED_PROTOCOL_VERSIONS = ['2024-11-05', '2025-03-26'];
   private transportCallbacks: TransportCallbacks = {};
+  private toolController: ToolController;
 
   constructor(config: any) {
-    // No longer need to store config as a class property since we're importing it directly
+    // Initialize tool controller
+    this.toolController = new ToolController(config);
   }
   
   /**
@@ -290,9 +292,12 @@ export class SimpleMcpServer {
         case 'tools/list':
           this.handleListToolsRequest(res, id, transport, session);
           break;
-          
-        case 'tools/call':
+            case 'tools/call':
           await this.handleCallToolRequest(params, res, id, transport, session);
+          break;
+          
+        case 'tools/abort':
+          await this.handleToolAbortRequest(params, res, id, transport, session);
           break;
           
         case 'resources/list':
@@ -480,9 +485,7 @@ export class SimpleMcpServer {
         id
       }, transport);
       return;
-    }
-
-    const { name, arguments: toolArgs } = params;
+    }    const { name, arguments: toolArgs } = params;
     this.logger.info(`Tool call request for ${name}`, toolArgs);
 
     try {
@@ -513,20 +516,22 @@ export class SimpleMcpServer {
         }, transport);
         return;
       }
+      
+      // Generate a unique tool ID for tracking
+      const toolId = `${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const result = await tool.execute(validParams);
       
       // Log tool execution result details
       this.logger.info('🔧 TOOL EXECUTION COMPLETED:', {
         toolName: name,
+        toolId,
         resultType: typeof result,
         resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
         success: result && typeof result === 'object' ? result.success : 'unknown',
         hasError: result && typeof result === 'object' ? !!result.error : false,
         executionTime: Date.now()
-      });
-
-      // Convert result to MCP format
+      });      // Convert result to MCP format
       const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
       const mcpResult = {
         content: [
@@ -534,7 +539,11 @@ export class SimpleMcpServer {
             type: 'text',
             text: resultText
           }
-        ]
+        ],
+        metadata: {
+          toolId: toolId,
+          canBeAborted: true
+        }
       };
 
       // Log the MCP-formatted result before sending
@@ -660,9 +669,7 @@ export class SimpleMcpServer {
           id
         }, transport);
         return;
-      }
-
-      // Validate parameters
+      }      // Validate parameters
       const validation = tool.parameters.validate(toolArgs);
       if (validation.error) {
         this.sendMessage(res, {
@@ -676,12 +683,16 @@ export class SimpleMcpServer {
         return;
       }
 
+      // Generate a unique tool ID for tracking
+      const toolId = `legacy-${name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       // Execute tool
       const result = await tool.execute(validation.value);
       
       // Log legacy tool execution result details
       this.logger.info('🔧 LEGACY TOOL EXECUTION COMPLETED:', {
         toolName: name,
+        toolId,
         resultType: typeof result,
         resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
         success: result && typeof result === 'object' ? result.success : 'unknown',
@@ -699,9 +710,7 @@ export class SimpleMcpServer {
         contentType: 'text',
         textPreview: resultText.substring(0, 300) + (resultText.length > 300 ? '...' : ''),
         requestId: id
-      });
-
-      this.sendMessage(res, {
+      });      this.sendMessage(res, {
         jsonrpc: '2.0',
         result: {
           content: [
@@ -709,7 +718,11 @@ export class SimpleMcpServer {
               type: 'text',
               text: resultText
             }
-          ]
+          ],
+          metadata: {
+            toolId: toolId,
+            canBeAborted: true
+          }
         },
         id
       }, transport);
@@ -951,6 +964,65 @@ export class SimpleMcpServer {
           id: null
         });
       }
+    }
+  }
+
+  /**
+   * Handle tool abort request
+   */
+  private async handleToolAbortRequest(params: any, res: Response, id: string | number, transport: 'sse' | 'streamable', session?: SessionData): Promise<void> {
+    if (session && !session.initialized) {
+      this.sendMessage(res, {
+        jsonrpc: '2.0',
+        error: {
+          code: -32002,
+          message: 'Session not initialized',
+        },
+        id
+      }, transport);
+      return;
+    }
+
+    const { toolId } = params;
+    this.logger.info(`Tool abort request for ${toolId}`);
+
+    if (!toolId) {
+      this.sendMessage(res, {
+        jsonrpc: '2.0',
+        error: {
+          code: -32602,
+          message: 'Missing required parameter: toolId',
+        },
+        id
+      }, transport);
+      return;
+    }
+
+    try {
+      // Pass the abort request to the tool controller
+      const abortSuccess = this.toolController.abortToolExecution(toolId);
+      
+      this.sendMessage(res, {
+        jsonrpc: '2.0',
+        result: {
+          success: abortSuccess,
+          message: abortSuccess 
+            ? `Successfully aborted tool execution: ${toolId}` 
+            : `Failed to abort tool execution: ${toolId}`
+        },
+        id
+      }, transport);
+    } catch (error: any) {
+      this.logger.error(`Error aborting tool ${toolId}:`, error);
+      this.sendMessage(res, {
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal server error during tool abort',
+          data: { error: error.message }
+        },
+        id
+      }, transport);
     }
   }
 }

@@ -1,5 +1,7 @@
+import { Request, Response } from 'express';
 import Joi from 'joi';
 import config from '../config';
+import { BaseTool } from '../services/tools/BaseTool';
 import { DateTimeTool } from '../services/tools/DateTimeTool';
 import { CrawlTool } from '../services/tools/CrawlTool';
 import { ExtractLinksTool } from '../services/tools/ExtractLinksTool';
@@ -40,6 +42,7 @@ export class ToolController {
   private searchInPageTool: SearchInPageTool;
   private webSearchTool: WebSearchTool;
   private logger = createLogger('ToolController');
+  private activeTools = new Map<string, { toolInstance: BaseTool<any, any>, startTime: number }>();
 
   constructor(config: any) {
     this.dateTimeTool = new DateTimeTool();
@@ -372,14 +375,13 @@ export class ToolController {
       parameterDescription: "Optional: city (default: 'Berlin'), format (default: 'both'), includeTimezone (default: true).",
       returnDescription: "Current date and time in multiple formats with timezone and additional calendar information."
     };
-  }
-  /**
+  }  /**
    * Execute the basic crawl operation using CrawlTool
    */
   private async executeCrawl(params: CrawlParams): Promise<CrawlResponse> {
-    return await this.crawlTool.execute(params);
-  }
-  /**
+    const toolId = `crawl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.crawlTool, params);
+  }  /**
    * Execute the markdown crawl operation using CrawlTool
    */
   private async executeCrawlWithMarkdown(params: CrawlWithMarkdownParams): Promise<CrawlWithMarkdownResponse> {
@@ -394,7 +396,11 @@ export class ToolController {
         strategy: params.strategy || 'bestFirst'
       };
       
-      const result = await this.crawlTool.execute(crawlParams);
+      // Generate a tool ID for tracking
+      const toolId = `crawlwithmarkdown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Execute the crawl with tracking
+      const result = await this.executeToolWithTracking(toolId, this.crawlTool, crawlParams);
       
       if (!result.success || !result.text) {
         return {
@@ -456,37 +462,108 @@ export class ToolController {
       };
     }
   }
-
   /**
    * Execute date/time tool using DateTimeTool service
-   */  private async executeDateTime(params: DateTimeParams): Promise<DateTimeResponse> {
-    return await this.dateTimeTool.execute(params);
-  }
-  /**
+   */  
+  private async executeDateTime(params: DateTimeParams): Promise<DateTimeResponse> {
+    const toolId = `datetime-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.dateTimeTool, params);
+  }  /**
    * Execute web search using the selected search engine
    */
   private async executeWebSearch(params: WebSearchParams): Promise<WebSearchResponse> {
-    return await this.webSearchTool.execute(params);
+    const toolId = `websearch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.webSearchTool, params);
   }/**
    * Execute search within a specific page
    */
   private async executeSearchInPage(params: SearchInPageParams): Promise<SearchInPageResponse> {
-    return await this.searchInPageTool.execute(params);
+    const toolId = `searchinpage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.searchInPageTool, params);
   }  /**
    * Execute smart crawl with relevance scoring
    */
   private async executeSmartCrawl(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
-    return await this.smartCrawlTool.execute(params);
+    const toolId = `smartcrawl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.smartCrawlTool, params);
   }  /**
    * Execute link extraction from a specific page
    */
   private async executeExtractLinks(params: ExtractLinksParams): Promise<ExtractLinksResponse> {
-    return await this.extractLinksTool.execute(params);
-  }
-  /**
+    const toolId = `extractlinks-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.extractLinksTool, params);
+  }  /**
    * Execute sitemap generation
    */
   private async executeGenerateSitemap(params: SitemapGeneratorParams): Promise<SitemapGeneratorResponse> {
-    return await this.sitemapTool.execute(params);
+    const toolId = `sitemap-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return await this.executeToolWithTracking(toolId, this.sitemapTool, params);
+  }
+  /**
+   * Abort a tool execution by toolId
+   * @param toolId The ID of the tool execution to abort
+   * @returns A boolean indicating whether the abort was successful
+   */
+  public abortToolExecution(toolId: string): boolean {
+    try {
+      this.logger.info(`Attempting to abort tool execution: ${toolId}`);
+      
+      const activeToolData = this.activeTools.get(toolId);
+      if (!activeToolData) {
+        this.logger.warn(`No active tool found with ID: ${toolId}`);
+        return false;
+      }
+      
+      const { toolInstance, startTime } = activeToolData;
+      const executionTime = Date.now() - startTime;
+      
+      this.logger.info(`Aborting tool execution ${toolId} after ${executionTime}ms`);
+      const abortSuccess = toolInstance.abort();
+      
+      if (abortSuccess) {
+        this.activeTools.delete(toolId);
+        this.logger.info(`Successfully aborted tool execution: ${toolId}`);
+      } else {
+        this.logger.warn(`Failed to abort tool execution: ${toolId}`);
+      }
+      
+      return abortSuccess;
+    } catch (error) {
+      this.logger.error(`Error aborting tool execution ${toolId}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * Execute tool with tracking
+   * @param toolId Unique identifier for this tool execution
+   * @param toolInstance The tool instance to execute
+   * @param params The parameters for the tool
+   * @returns Result from the tool execution
+   */
+  private async executeToolWithTracking<P, R>(
+    toolId: string, 
+    toolInstance: BaseTool<P, R>, 
+    params: P
+  ): Promise<R> {
+    try {
+      // Register the active tool execution
+      this.activeTools.set(toolId, {
+        toolInstance,
+        startTime: Date.now()
+      });
+      
+      // Execute the tool
+      const result = await toolInstance.execute(params);
+      
+      // Clean up the tracking
+      this.activeTools.delete(toolId);
+      
+      return result;
+    } catch (error) {
+      // Clean up tracking on error
+      this.activeTools.delete(toolId);
+      throw error;
+    }
   }
 }

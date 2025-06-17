@@ -32,26 +32,63 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
       throw error;
     }
   }
-
   /**
    * Execute smart crawl with relevance scoring
    */
   public async execute(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
     this.logger.info('Executing smartCrawl with params:', params);
     
+    // Create a new abort controller for this execution
+    const signal = this.createAbortController();
+    const startTime = Date.now();
+    
     try {
-      const crawlResult = await this.executeSmartCrawl(params);      if (!crawlResult.success) {
+      const crawlResult = await this.executeSmartCrawl(params, signal);
+      
+      // Check if the operation was aborted
+      if (signal.aborted) {
+        this.logger.info('Smart crawl operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          relevantPages: [],
+          overallSummary: 'Operation aborted by user',
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+      
+      if (!crawlResult.success) {
         return {
           success: false,
           url: params.url,
           query: params.query,
           relevantPages: [],
           overallSummary: 'Smart crawl failed',
-          error: crawlResult.error || 'Smart crawl failed'
+          error: crawlResult.error || 'Smart crawl failed',
+          processingTime: Date.now() - startTime
         };
       }
 
-      return crawlResult;    } catch (error: any) {
+      // Add processing time to the result
+      crawlResult.processingTime = Date.now() - startTime;
+      return crawlResult;
+    } catch (error: any) {
+      // Check if the error is due to an abort
+      if (error.name === 'AbortError') {
+        this.logger.info('Smart crawl operation was aborted');
+        return {
+          success: false,
+          url: params.url,
+          query: params.query,
+          relevantPages: [],
+          overallSummary: 'Operation aborted by user',
+          error: 'Operation aborted by user',
+          processingTime: Date.now() - startTime
+        };
+      }
+      
       this.logger.error('Error in SmartCrawlTool execute:', error);
       return {
         success: false,
@@ -59,15 +96,15 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
         query: params.query,
         relevantPages: [],
         overallSummary: 'Error occurred during smart crawl',
-        error: error.message
+        error: error.message,
+        processingTime: Date.now() - startTime
       };
     }
   }
-
   /**
    * Launches a new browser instance for an operation.
    */
-  private async launchBrowser(): Promise<Browser> {
+  private async launchBrowser(signal?: AbortSignal): Promise<Browser> {
     this.logger.info('Launching new browser instance for operation');
     try {
       const launchOptions = {
@@ -92,6 +129,12 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
           height: 720
         }
       };
+      
+      // Check if operation was aborted before launching browser
+      if (signal?.aborted) {
+        throw new Error('Operation aborted before browser launch');
+      }
+      
       return await puppeteer.launch(launchOptions);
     } catch (error) {
       this.logger.error('Failed to launch browser:', error);
@@ -195,16 +238,16 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
   }
 
   /**
+     /**
    * Execute smart crawl with relevance scoring
    */
-  private async executeSmartCrawl(params: SmartCrawlParams): Promise<SmartCrawlResponse> {
+  private async executeSmartCrawl(params: SmartCrawlParams, signal: AbortSignal): Promise<SmartCrawlResponse> {
     this.logger.info(`Starting smart crawl for: ${params.url} with query: ${params.query}`);
     
     const maxPages = params.maxPages || 5;
     const depth = params.depth || 2;
     const relevanceThreshold = params.relevanceThreshold || 2;
-    
-    const visitedUrls = new Set<string>();
+      const visitedUrls = new Set<string>();
     const pagesToVisit: Array<{ url: string; depth: number }> = [{ url: params.url, depth: 0 }];
     const results: Array<{
       url: string;
@@ -215,10 +258,19 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
       depth: number;
     }> = [];
     
-    const browser = await this.launchBrowser();
+    let browser: Browser | null = null;
     
     try {
+      // Launch browser with abort signal
+      browser = await this.launchBrowser(signal);
+      
       while (pagesToVisit.length > 0 && results.length < maxPages) {
+        // Check if operation was aborted
+        if (signal.aborted) {
+          this.logger.info('Smart crawl operation aborted during execution');
+          throw new Error('AbortError');
+        }
+        
         const { url, depth: currentDepth } = pagesToVisit.shift()!;
         
         if (visitedUrls.has(url) || currentDepth > depth) {
@@ -230,11 +282,31 @@ export class SmartCrawlTool extends BaseTool<SmartCrawlParams, SmartCrawlRespons
         try {
           const page = await this.createStandardPage(browser);
           
-          // Navigate to the URL
-          await this.navigateWithRetry(page, url);
+          // Navigate to the URL with abort handling
+          await Promise.race([
+            this.navigateWithRetry(page, url),
+            new Promise((_, reject) => {
+              const onAbort = () => {
+                page.close().catch(err => this.logger.error('Error closing page after abort:', err));
+                reject(new Error('AbortError'));
+              };
+              
+              if (signal.aborted) {
+                onAbort();
+              } else {
+                signal.addEventListener('abort', onAbort, { once: true });
+              }
+            })
+          ]);
           
-          // Wait for page to stabilize
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Wait for page to stabilize with abort handling
+          await Promise.race([
+            new Promise(resolve => setTimeout(resolve, 2000)),
+            new Promise((_, reject) => {
+              const onAbort = () => reject(new Error('AbortError'));
+              signal.addEventListener('abort', onAbort, { once: true });
+            })
+          ]);
           
           // Extract page data
           const pageData = await page.evaluate(() => {
